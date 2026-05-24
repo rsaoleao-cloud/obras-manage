@@ -266,13 +266,14 @@ select.fi option{background:var(--bg2);color:var(--text)}
         <div class="ftitle">Registrar Gasto</div>
         <div class="fl">
           <div class="fg"><label class="flbl">Obra</label><select class="fi" id="l-obra"></select></div>
-          <div class="fg"><label class="flbl">Categoria</label>
+          <div class="fg"><label class="flbl">Tipo de Despesa</label>
             <select class="fi" id="l-tipo">
               <option value="despesa">💼 Despesa / Serviço</option>
               <option value="almoco">🍽 Almoço / Alimentação</option>
               <option value="hospedagem">🏨 Hospedagem</option>
               <option value="combustivel">⛽ Combustível</option>
-              <option value="prestador">🧑‍🔧 Prestador</option><option value="peca">🔩 Peça / Material</option>
+              <option value="prestador">🧑‍🔧 Prestador</option>
+              <option value="peca">🔩 Peça / Material</option>
             </select>
           </div>
         </div>
@@ -320,13 +321,31 @@ select.fi option{background:var(--bg2);color:var(--text)}
 
     <!-- RELATÓRIO -->
     <div class="page" id="page-relatorio">
-      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px;flex-wrap:wrap;gap:10px">
-        <div style="display:flex;gap:10px;align-items:flex-end">
-          <div><label class="flbl" style="display:block">Mês</label><select class="fi" id="r-mes" style="width:155px"></select></div>
-          <div><label class="flbl" style="display:block">Obra</label><select class="fi" id="r-obra" style="width:195px"></select></div>
-          <button class="btn btn-primary" id="btn-filtrar-rel">Filtrar</button>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;margin-bottom:18px;box-shadow:var(--shadow)">
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px">
+          <div><label class="flbl" style="display:block">Mês</label><select class="fi" id="r-mes" style="width:145px"></select></div>
+          <div><label class="flbl" style="display:block">Obra</label><select class="fi" id="r-obra" style="width:185px"></select></div>
+          <div><label class="flbl" style="display:block">Categoria</label>
+            <select class="fi" id="r-cat" style="width:175px">
+              <option value="">Todas as categorias</option>
+              <option value="despesa">💼 Despesa</option>
+              <option value="almoco">🍽 Almoço</option>
+              <option value="hospedagem">🏨 Hospedagem</option>
+              <option value="combustivel">⛽ Combustível</option>
+              <option value="prestador">🧑‍🔧 Prestador</option>
+              <option value="peca">🔩 Peça / Material</option>
+            </select>
+          </div>
+          <div><label class="flbl" style="display:block">Lançamento</label><input class="fi" id="r-busca" placeholder="Buscar descrição..." style="width:185px"></div>
+          <button class="btn btn-primary" id="btn-filtrar-rel">🔍 Filtrar</button>
+          <button class="btn" id="btn-limpar-rel">✕ Limpar</button>
         </div>
-        <button class="btn" id="btn-print">🖨 Imprimir / PDF</button>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <div style="font-size:11px;color:var(--text3);font-family:var(--mono)" id="rel-contador"></div>
+          <div style="margin-left:auto;display:flex;gap:7px">
+            <button class="btn" id="btn-print">🖨 Imprimir / PDF</button>
+          </div>
+        </div>
       </div>
       <div id="rel-body"></div>
     </div>
@@ -917,6 +936,35 @@ function rLancamentos(){
   document.getElementById('l-obra').innerHTML=opts||'<option value="">Nenhuma obra</option>';
   document.getElementById('l-data').value=hoje();
   atualizarPreview();
+
+  var mes=mesAtual();
+  var lancsDoMes=S.lancamentos.filter(function(l){return l.mes===mes;});
+
+  // Resumo por tipo de despesa no mês atual
+  var resumo='';
+  if(lancsDoMes.length){
+    var porCat={};
+    lancsDoMes.forEach(function(l){
+      if(!porCat[l.tipo])porCat[l.tipo]=0;
+      porCat[l.tipo]+=Number(l.valor);
+    });
+    var totalMes=lancsDoMes.reduce(function(a,l){return a+Number(l.valor);},0);
+    var catCols=Object.keys(porCat).map(function(cat){
+      var c=CATEGORIAS[cat]||CATEGORIAS.despesa;
+      var pct=((porCat[cat]/totalMes)*100).toFixed(0);
+      return'<div style="background:'+c.bg+';border:1px solid '+c.border+';border-radius:var(--rsm);padding:10px 14px;min-width:130px">'+
+        '<div style="font-size:11px;color:'+c.cor+';font-family:var(--mono);font-weight:600">'+c.icon+' '+c.label+'</div>'+
+        '<div style="font-size:16px;font-weight:600;font-family:var(--mono);color:var(--text);margin-top:4px">'+fM(porCat[cat])+'</div>'+
+        '<div style="font-size:10px;color:var(--text3);margin-top:2px">'+pct+'% do mês</div>'+
+      '</div>';
+    }).join('');
+    resumo='<div style="margin-bottom:18px">'+
+      '<div class="section-hdr" style="margin-bottom:10px">Gastos por tipo de despesa — '+mesLabel(mes)+'</div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px">'+catCols+'</div>'+
+      '<div style="font-size:11px;font-family:var(--mono);color:var(--text3)">Total do mês: <strong style="color:var(--text)">'+fM(totalMes)+'</strong> · '+lancsDoMes.length+' lançamentos</div>'+
+    '</div>';
+  }
+
   var rec=S.lancamentos.slice().sort(function(a,b){return b.data.localeCompare(a.data);}).slice(0,15);
   var rows='';
   rec.forEach(function(l){
@@ -925,7 +973,9 @@ function rLancamentos(){
     var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':'<span style="font-size:10px;color:var(--text4)">À vista</span>';
     rows+='<tr><td>'+fD(l.data)+'</td><td>'+(o?o.nome:'—')+'</td><td>'+l.descricao+'</td><td>'+(l.resp||'—')+'</td><td>'+tb+'</td><td>'+pb+'</td><td style="font-family:var(--mono);text-align:right">'+fM(l.valor)+'</td><td><button class="btn btn-danger" style="font-size:10px;padding:3px 8px" data-id="'+l.id+'">✕</button></td></tr>';
   });
-  document.getElementById('lanc-rec').innerHTML=rec.length?'<div class="tw"><div class="tw-hdr">Últimos lançamentos</div><table><thead><tr><th>Data</th><th>Obra</th><th>Descrição</th><th>Resp.</th><th>Tipo</th><th>Pgto</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>':'';
+  document.getElementById('lanc-rec').innerHTML=
+    resumo+
+    (rec.length?'<div class="tw"><div class="tw-hdr">Últimos lançamentos</div><table><thead><tr><th>Data</th><th>Obra</th><th>Descrição</th><th>Resp.</th><th>Tipo de Despesa</th><th>Pgto</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>':'');
   document.querySelectorAll('#lanc-rec .btn-danger[data-id]').forEach(function(b){b.addEventListener('click',function(){delLanc(this.dataset.id,null);rLancamentos();});});
 }
 
@@ -993,50 +1043,117 @@ function filtrarHistorico(){
 function rRelatorio(){
   var mes=mesAtual();
   var meses={};meses[mes]=true;
-  S.lancamentos.forEach(function(l){meses[l.mes]=true;});
+  S.lancamentos.forEach(function(l){if(l.mes)meses[l.mes]=true;});
   var mArr=Object.keys(meses).sort().reverse();
-  var selM=document.getElementById('r-mes'),selO=document.getElementById('r-obra');
-  var curM=selM.value||mes,curO=selO.value||'';
-  selM.innerHTML=mArr.map(function(m){return'<option value="'+m+'"'+(m===curM?' selected':'')+'>'+mesLabel(m)+'</option>';}).join('');
-  selO.innerHTML='<option value="">Todas as obras</option>'+S.obras.map(function(o){return'<option value="'+o.id+'"'+(o.id===curO?' selected':'')+'>'+o.nome+'</option>';}).join('');
+
+  var selM=document.getElementById('r-mes');
+  var selO=document.getElementById('r-obra');
+  var selC=document.getElementById('r-cat');
+  var inpB=document.getElementById('r-busca');
+  if(!selM||!selO)return;
+
+  // Guarda seleção ANTES de repopular
+  var curM=selM.value||mes;
+  var curO=selO.value||'';
+  var curC=selC?selC.value||'':'';
+  var curB=inpB?inpB.value.trim().toLowerCase():'';
+
+  // Popula meses preservando seleção atual
+  selM.innerHTML=mArr.map(function(m){
+    return'<option value="'+m+'"'+(m===curM?' selected':'')+'>'+mesLabel(m)+'</option>';
+  }).join('');
+  // Se não tinha valor, força selecionar o mês atual no elemento
+  if(!selM.value)selM.value=mes;
+  curM=selM.value;
+
+  selO.innerHTML='<option value="">Todas as obras</option>'+S.obras.map(function(o){
+    return'<option value="'+o.id+'"'+(o.id===curO?' selected':'')+'>'+o.nome+'</option>';
+  }).join('');
+
   var obras=curO?S.obras.filter(function(o){return o.id===curO;}):S.obras;
   var body=document.getElementById('rel-body');
   var h='';
   var dn=new Date();
   if(dn.getDate()>=20)h+='<div class="alert al-ok" style="margin-bottom:14px"><span>📋</span><span>Dia 20+ — Relatório de '+mesLabel(curM)+' disponível para impressão!</span></div>';
-  var gt=0;
+
+  var gt=0; var totalLancs=0;
+
   obras.forEach(function(o){
-    var lancs=gastosMes(o.id,curM);
+    // filtra lançamentos pelo mês, categoria e busca
+    var lancs=gastosMes(o.id,curM).filter(function(l){
+      if(curC&&l.tipo!==curC)return false;
+      if(curB&&l.descricao.toLowerCase().indexOf(curB)===-1)return false;
+      return true;
+    });
+    if(!lancs.length&&(curC||curB))return; // oculta obras sem resultado no filtro
+    totalLancs+=lancs.length;
+
     var tot=lancs.reduce(function(a,l){return a+Number(l.valor);},0);gt+=tot;
     var pp=o.budget?((tot/Number(o.budget))*100).toFixed(0):'-';
     var cor=Number(pp)>=100?'#dc2626':Number(pp)>=90?'#ea580c':Number(pp)>=70?'#d97706':'#2563eb';
-    var makeRows=function(arr){return arr.map(function(l){var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':'';return'<tr><td>'+fD(l.data)+'</td><td>'+l.descricao+'</td><td>'+(l.resp||'—')+'</td><td>'+pb+'</td><td style="font-family:var(--mono);text-align:right">'+fM(l.valor)+'</td></tr>';}).join('');};
-    h+='<div class="rel-os"><div class="rel-ot"><span>'+o.nome+'</span><div style="display:flex;gap:14px;font-size:11px;font-family:var(--mono);align-items:center">'+(o.prazo?'<span style="color:var(--text3)">Prazo: '+fD(o.prazo)+'</span>':'')+statusBadge(o.status)+(o.budget?'<span style="color:'+cor+'">'+pp+'% (Budget: '+fM(o.budget)+')</span>':'')+'</div></div><div class="rel-bi">';
-    // render por categoria
-    var catsPresentes=['despesa','almoco','hospedagem','combustivel','prestador','peca'];
-    catsPresentes.forEach(function(cat){
-      var arr=lancs.filter(function(l){return l.tipo===cat;});
-      if(!arr.length)return;
-      var tCat=arr.reduce(function(a,l){return a+Number(l.valor);},0);
-      var c=CATEGORIAS[cat]||CATEGORIAS.despesa;
-      // verifica se tem limite para esta categoria
-      var budgetCat=cat==='almoco'?o.b_almoco:cat==='hospedagem'?o.b_hospedagem:cat==='combustivel'?o.b_combustivel:cat==='prestador'?o.b_prestador:'';
-      var catPct=budgetCat&&Number(budgetCat)>0?((tCat/Number(budgetCat))*100):null;
-      var catCorPct=catPct===null?c.cor:catPct>=100?'#dc2626':catPct>=90?'#ea580c':catPct>=70?'#d97706':'#16a34a';
-      var limiteTxt=budgetCat&&Number(budgetCat)>0?' · '+(catPct.toFixed(0))+'% do limite ('+fM(budgetCat)+')':'';
-      h+='<div style="padding:7px 14px;background:'+c.bg+';border-bottom:1px solid var(--border);font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;display:flex;justify-content:space-between;align-items:center">'+
-        '<span style="color:'+c.cor+'">'+c.icon+' '+c.label+'</span>'+
-        '<span style="color:'+catCorPct+';font-size:10px">'+fM(tCat)+limiteTxt+'</span>'+
-      '</div>'+
-      '<table><thead><tr><th>Data</th><th>Descrição</th><th>Resp.</th><th>Pgto</th><th style="text-align:right">Valor</th></tr></thead><tbody>'+makeRows(arr)+'</tbody></table>'+
-      '<div class="rel-sub"><span style="color:'+c.cor+'">Subtotal '+c.label+'</span><span style="font-family:var(--mono);color:'+c.cor+'">'+fM(tCat)+'</span></div>';
-    });
-    if(!lancs.length)h+='<div style="padding:18px;text-align:center;color:var(--text4);font-size:12px">Sem lançamentos</div>';
+    var makeRows=function(arr){
+      return arr.slice().sort(function(a,b){return b.data.localeCompare(a.data);}).map(function(l){
+        var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':'';
+        var cb=catBadge(l.tipo);
+        // destaca busca
+        var desc=l.descricao;
+        if(curB){desc=desc.replace(new RegExp('('+curB+')','gi'),'<mark style="background:#fef08a;border-radius:2px">$1</mark>');}
+        return'<tr><td style="white-space:nowrap">'+fD(l.data)+'</td><td>'+desc+'</td><td>'+(l.resp||'—')+'</td><td>'+cb+'</td><td>'+pb+'</td><td style="font-family:var(--mono);text-align:right;white-space:nowrap">'+fM(l.valor)+'</td></tr>';
+      }).join('');
+    };
+
+    h+='<div class="rel-os"><div class="rel-ot"><span>'+o.nome+'</span><div style="display:flex;gap:12px;font-size:11px;font-family:var(--mono);align-items:center">'+(o.prazo?'<span style="color:var(--text3)">Prazo: '+fD(o.prazo)+'</span>':'')+statusBadge(o.status)+(o.budget&&!curC?'<span style="color:'+cor+'">'+pp+'% do budget</span>':'')+'</div></div><div class="rel-bi">';
+
+    if(curC){
+      // mostra só a categoria filtrada
+      if(!lancs.length){
+        h+='<div style="padding:18px;text-align:center;color:var(--text4);font-size:12px">Nenhum lançamento nesta categoria</div>';
+      } else {
+        var c=CATEGORIAS[curC]||CATEGORIAS.despesa;
+        var tCat=lancs.reduce(function(a,l){return a+Number(l.valor);},0);
+        h+='<div style="padding:7px 14px;background:'+c.bg+';border-bottom:1px solid var(--border);font-size:10px;font-family:var(--mono);text-transform:uppercase;display:flex;justify-content:space-between">'+
+          '<span style="color:'+c.cor+'">'+c.icon+' '+c.label+'</span><span style="color:'+c.cor+'">'+fM(tCat)+'</span></div>'+
+          '<table><thead><tr><th>Data</th><th>Descrição</th><th>Resp.</th><th>Categoria</th><th>Pgto</th><th style="text-align:right">Valor</th></tr></thead><tbody>'+makeRows(lancs)+'</tbody></table>';
+      }
+    } else {
+      // agrupa por categoria
+      var catsPresentes=['despesa','almoco','hospedagem','combustivel','prestador','peca'];
+      var algum=false;
+      catsPresentes.forEach(function(cat){
+        var arr=lancs.filter(function(l){return l.tipo===cat;});
+        if(!arr.length)return;
+        algum=true;
+        var tCat=arr.reduce(function(a,l){return a+Number(l.valor);},0);
+        var c=CATEGORIAS[cat]||CATEGORIAS.despesa;
+        var budgetCat=cat==='almoco'?o.b_almoco:cat==='hospedagem'?o.b_hospedagem:cat==='combustivel'?o.b_combustivel:cat==='prestador'?o.b_prestador:'';
+        var catPct=budgetCat&&Number(budgetCat)>0?((tCat/Number(budgetCat))*100):null;
+        var catCorPct=catPct===null?c.cor:catPct>=100?'#dc2626':catPct>=90?'#ea580c':catPct>=70?'#d97706':'#16a34a';
+        var limiteTxt=budgetCat&&Number(budgetCat)>0?' · '+catPct.toFixed(0)+'% do limite ('+fM(budgetCat)+')':'';
+        h+='<div style="padding:7px 14px;background:'+c.bg+';border-bottom:1px solid var(--border);font-size:10px;font-family:var(--mono);text-transform:uppercase;display:flex;justify-content:space-between">'+
+          '<span style="color:'+c.cor+'">'+c.icon+' '+c.label+'</span>'+
+          '<span style="color:'+catCorPct+'">'+fM(tCat)+limiteTxt+'</span></div>'+
+          '<table><thead><tr><th>Data</th><th>Descrição</th><th>Resp.</th><th>Categoria</th><th>Pgto</th><th style="text-align:right">Valor</th></tr></thead><tbody>'+makeRows(arr)+'</tbody></table>'+
+          '<div class="rel-sub"><span style="color:'+c.cor+'">Subtotal '+c.label+'</span><span style="font-family:var(--mono);color:'+c.cor+'">'+fM(tCat)+'</span></div>';
+      });
+      if(!algum)h+='<div style="padding:18px;text-align:center;color:var(--text4);font-size:12px">Sem lançamentos neste período</div>';
+    }
+
     h+='<div class="rel-sub" style="background:var(--bg4)"><strong>Total '+o.nome+'</strong><strong style="font-family:var(--mono);color:var(--accent)">'+fM(tot)+'</strong></div></div></div>';
   });
-  if(gt>0&&!curO)h+='<div class="rel-gt"><span style="font-family:var(--serif);font-size:16px">💰 Total Geral — '+mesLabel(curM)+'</span><span style="font-family:var(--mono);font-size:19px;color:var(--accent)">'+fM(gt)+'</span></div>';
-  if(!h)h='<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Nenhum dado neste período.</div></div>';
+
+  if(gt>0)h+='<div class="rel-gt"><span style="font-family:var(--serif);font-size:16px">💰 Total Geral — '+mesLabel(curM)+(curC?' · '+catLabel(curC):'')+'</span><span style="font-family:var(--mono);font-size:19px;color:var(--accent)">'+fM(gt)+'</span></div>';
+  if(!h||h.indexOf('rel-os')===-1)h='<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Nenhum dado encontrado com os filtros selecionados.</div></div>';
   body.innerHTML=h;
+
+  // contador
+  var cont=document.getElementById('rel-contador');
+  if(cont){
+    var filtrosTxt=[];
+    if(curO){var oF=findO(curO);if(oF)filtrosTxt.push(oF.nome);}
+    if(curC)filtrosTxt.push(catLabel(curC));
+    if(curB)filtrosTxt.push('"'+curB+'"');
+    cont.textContent=totalLancs+' lançamento'+(totalLancs!==1?'s':'')+(filtrosTxt.length?' · '+filtrosTxt.join(' · '):'');
+  }
 }
 
 // ===== CONFIG =====
@@ -1499,6 +1616,14 @@ document.getElementById('nav-relatorio').addEventListener('click',function(){sho
 document.getElementById('nav-config').addEventListener('click',function(){showPage('config');});
 document.getElementById('btn-salvar-lanc').addEventListener('click',saveLanc);
 document.getElementById('btn-filtrar-rel').addEventListener('click',rRelatorio);
+document.getElementById('btn-limpar-rel').addEventListener('click',function(){
+  document.getElementById('r-cat').value='';
+  document.getElementById('r-busca').value='';
+  rRelatorio();
+});
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&document.getElementById('r-busca')===document.activeElement)rRelatorio();
+});
 document.getElementById('btn-filtrar-hist').addEventListener('click',filtrarHistorico);
 document.getElementById('btn-print').addEventListener('click',function(){window.print();});
 document.getElementById('cfg-exp').addEventListener('click',exportar);
