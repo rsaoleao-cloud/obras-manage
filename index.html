@@ -1602,22 +1602,29 @@ function rConfig(){
   document.getElementById('cfg-obras').textContent=S.obras.length;
   document.getElementById('cfg-lancs').textContent=S.lancamentos.length;
   document.getElementById('cfg-data').textContent=fD(hoje());
+  // Sempre usa FB_DEFAULT como base, sobreposto pelo que estiver salvo
   var cfg=fbCarregarConfig()||FB_DEFAULT;
-  if(cfg){
-    var f1=document.getElementById('fb-apikey');
-    var f2=document.getElementById('fb-projectid');
-    var f3=document.getElementById('fb-appid');
-    if(f1)f1.value=cfg.apiKey||'';
-    if(f2)f2.value=cfg.projectId||'';
-    var f4=document.getElementById('fb-authdomain');
-    var f5=document.getElementById('fb-storagebucket');
-    var f6=document.getElementById('fb-senderid');
-    if(f4)f4.value=cfg.authDomain||(cfg.projectId+'.firebaseapp.com');
-    if(f5)f5.value=cfg.storageBucket||(cfg.projectId+'.firebasestorage.app');
-    if(f6)f6.value=cfg.messagingSenderId||'';
-    if(f3)f3.value=cfg.appId||'';
-    var msg=document.getElementById('fb-status-msg');
-    if(msg){msg.textContent=FB?'✅ Firebase conectado e ativo':'⚠ Credenciais salvas mas desconectadas';msg.style.color=FB?'#166534':'#d97706';}
+  var f1=document.getElementById('fb-apikey');
+  var f2=document.getElementById('fb-projectid');
+  var f3=document.getElementById('fb-appid');
+  var f4=document.getElementById('fb-authdomain');
+  var f5=document.getElementById('fb-storagebucket');
+  var f6=document.getElementById('fb-senderid');
+  if(f1)f1.value=cfg.apiKey||FB_DEFAULT.apiKey;
+  if(f2)f2.value=cfg.projectId||FB_DEFAULT.projectId;
+  if(f4)f4.value=cfg.authDomain||FB_DEFAULT.authDomain;
+  if(f5)f5.value=cfg.storageBucket||FB_DEFAULT.storageBucket;
+  if(f6)f6.value=cfg.messagingSenderId||FB_DEFAULT.messagingSenderId;
+  if(f3)f3.value=cfg.appId||FB_DEFAULT.appId;
+  var msg=document.getElementById('fb-status-msg');
+  if(msg){
+    if(FB){
+      msg.style.color='#10b981';
+      msg.textContent='✅ Firebase conectado e ativo — Projeto: '+cfg.projectId;
+    } else {
+      msg.style.color='#f59e0b';
+      msg.textContent='⚠ Não conectado. Clique em "Conectar Firebase".';
+    }
   }
 }
 
@@ -2216,6 +2223,13 @@ ld();
 S.obras.forEach(function(o){if(!o.budget&&o.orcamento)o.budget=o.orcamento;if(!o.status)o.status='andamento';});
 if(!S.excluidos)S.excluidos=[];
 bindAllMoney();
+
+// Garante que as credenciais padrão estejam sempre salvas no localStorage
+// (evita perda de configuração em novos dispositivos/sessões)
+var _cfgSalva = localStorage.getItem(FB_CFG_KEY);
+if(!_cfgSalva){
+  localStorage.setItem(FB_CFG_KEY, JSON.stringify(FB_DEFAULT));
+}
 
 // Inicia Firebase e Auth
 var _fbCfg = fbCarregarConfig();
