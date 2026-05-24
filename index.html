@@ -620,11 +620,33 @@ var USUARIO_ATUAL={id:'',nome:'',email:'',foto:''};
 var AUTH_READY = false;
 
 function iniciarAuth(){
-  var auth = firebase.auth();
-  // Persiste sessão no dispositivo
+  // Verifica se o ambiente suporta Firebase Auth
+  var proto = window.location.protocol;
+  var host  = window.location.hostname;
+  var suportaAuth = (proto === 'https:' || proto === 'chrome-extension:') &&
+                    host !== '' && host !== 'localhost' &&
+                    typeof window.localStorage !== 'undefined';
+
+  if(!suportaAuth){
+    // Ambiente local/preview — entra direto sem login Google
+    USUARIO_ATUAL = {id:'local', nome:'Usuário', email:'', foto:''};
+    document.getElementById('login-screen').style.display = 'none';
+    if(!AUTH_READY){ AUTH_READY = true; iniciarAppComAuth(); }
+    return;
+  }
+
+  var auth;
+  try{ auth = firebase.auth(); }
+  catch(e){
+    // Auth SDK não disponível — entra direto
+    USUARIO_ATUAL = {id:'local', nome:'Usuário', email:'', foto:''};
+    document.getElementById('login-screen').style.display = 'none';
+    if(!AUTH_READY){ AUTH_READY = true; iniciarAppComAuth(); }
+    return;
+  }
+
   auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
 
-  // Botão Google Login
   document.getElementById('btn-google-login').addEventListener('click', function(){
     var st = document.getElementById('login-status');
     st.textContent = 'Aguardando autenticação Google...';
@@ -634,10 +656,8 @@ function iniciarAuth(){
     });
   });
 
-  // Observer de estado de autenticação
   auth.onAuthStateChanged(function(user){
     if(user){
-      // Usuário autenticado
       USUARIO_ATUAL = {
         id:    user.uid,
         nome:  user.displayName || user.email,
@@ -646,17 +666,10 @@ function iniciarAuth(){
       };
       localStorage.setItem('obras_usuario_nome', USUARIO_ATUAL.nome);
       localStorage.setItem('obras_usuario_email', USUARIO_ATUAL.email);
-      // Esconde tela de login
       document.getElementById('login-screen').style.display = 'none';
-      // Atualiza chip do header
       atualizarChipUsuario();
-      // Inicia app se ainda não iniciou
-      if(!AUTH_READY){
-        AUTH_READY = true;
-        iniciarAppComAuth();
-      }
+      if(!AUTH_READY){ AUTH_READY = true; iniciarAppComAuth(); }
     } else {
-      // Não autenticado — mostra login
       document.getElementById('login-screen').style.display = 'flex';
       AUTH_READY = false;
     }
@@ -1461,30 +1474,57 @@ function rRelatorio(){
   var curO=selO.value||'';
   var mes=mesAtual();
 
-  // Renderiza cards de obras
-  if(!S.obras.length){
-    cardsDiv.innerHTML='<div style="color:var(--text4);font-size:12px">Nenhuma obra cadastrada</div>';
-  } else {
-    cardsDiv.innerHTML=S.obras.map(function(o){
-      var tot=totalMesObra(o.id,mes);
-      var p=pctBudget(o.id,mes);
-      var cor=pctColor(p);
-      var sel=curO===o.id?'selected':'';
-      return'<div class="rel-obra-card '+sel+'" data-id="'+o.id+'">'+
-        '<div class="rel-obra-card-name">'+o.nome+'</div>'+
-        '<div class="rel-obra-card-info">'+mesLabel(mes)+': <span style="color:'+cor+'">'+fM(tot)+'</span></div>'+
-        '<div class="rel-obra-card-info" style="margin-top:3px">'+p.toFixed(0)+'% budget</div>'+
-      '</div>';
-    }).join('');
+  // Renderiza cards de obras (só se ainda não estiverem renderizados ou lista mudou)
+  var cardsRendered = cardsDiv.querySelectorAll('.rel-obra-card').length;
+  if(cardsRendered !== S.obras.length || !cardsRendered){
+    if(!S.obras.length){
+      cardsDiv.innerHTML='<div style="color:var(--text4);font-size:12px">Nenhuma obra cadastrada</div>';
+    } else {
+      cardsDiv.innerHTML=S.obras.map(function(o){
+        var tot=totalMesObra(o.id,mes);
+        var p=pctBudget(o.id,mes);
+        var cor=pctColor(p);
+        var sel=curO===o.id?'selected':'';
+        return'<div class="rel-obra-card '+sel+'" data-id="'+o.id+'">'+
+          '<div class="rel-obra-card-name">'+o.nome+'</div>'+
+          '<div class="rel-obra-card-info">'+mesLabel(mes)+': <span style="color:'+cor+'">'+fM(tot)+'</span></div>'+
+          '<div class="rel-obra-card-info" style="margin-top:3px">'+p.toFixed(0)+'% budget</div>'+
+        '</div>';
+      }).join('');
+    }
+    // Wire up click events
     cardsDiv.querySelectorAll('.rel-obra-card').forEach(function(card){
       card.addEventListener('click',function(){
+        // Atualiza visual de seleção
         cardsDiv.querySelectorAll('.rel-obra-card').forEach(function(c){c.classList.remove('selected');});
         this.classList.add('selected');
+        // Salva obra selecionada e gera relatório SEM recriar cards
         selO.value=this.dataset.id;
-        rRelatorio();
+        gerarRelatorio();
       });
     });
+  } else {
+    // Cards já existem — só atualiza classe selected
+    cardsDiv.querySelectorAll('.rel-obra-card').forEach(function(card){
+      card.classList.toggle('selected', card.dataset.id===curO);
+    });
   }
+
+  // Gera o relatório com a obra selecionada
+  gerarRelatorio();
+}
+
+function gerarRelatorio(){
+  var selO=document.getElementById('r-obra');
+  var selM=document.getElementById('r-mes');
+  var selC=document.getElementById('r-cat');
+  var inpB=document.getElementById('r-busca');
+  var filtros=document.getElementById('rel-filtros-secundarios');
+  var body=document.getElementById('rel-body');
+  if(!selO||!body)return;
+
+  var curO=selO.value||'';
+  var mes=mesAtual();
 
   if(!curO){
     if(filtros)filtros.style.display='none';
@@ -2033,14 +2073,14 @@ document.getElementById('nav-excluidos').addEventListener('click',function(){sho
 document.getElementById('nav-relatorio').addEventListener('click',function(){showPage('relatorio');});
 document.getElementById('nav-config').addEventListener('click',function(){showPage('config');});
 document.getElementById('btn-salvar-lanc').addEventListener('click',saveLanc);
-document.getElementById('btn-filtrar-rel').addEventListener('click',rRelatorio);
+document.getElementById('btn-filtrar-rel').addEventListener('click',gerarRelatorio);
 document.getElementById('btn-limpar-rel').addEventListener('click',function(){
   document.getElementById('r-cat').value='';
   document.getElementById('r-busca').value='';
-  rRelatorio();
+  gerarRelatorio();
 });
 document.addEventListener('keydown',function(e){
-  if(e.key==='Enter'&&document.getElementById('r-busca')===document.activeElement)rRelatorio();
+  if(e.key==='Enter'&&document.getElementById('r-busca')===document.activeElement)gerarRelatorio();
 });
 document.getElementById('btn-filtrar-hist').addEventListener('click',filtrarHistorico);
 document.getElementById('btn-print').addEventListener('click',function(){window.print();});
