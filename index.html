@@ -202,7 +202,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
 .divider{height:1px;background:var(--border);margin:16px 0}
 .section-hdr{font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;font-weight:600}
 </style>
-<!-- Firebase SDK -->
+<!-- Firebase SDK — carregado antes do script principal -->
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 </head>
@@ -272,7 +272,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
               <option value="almoco">🍽 Almoço / Alimentação</option>
               <option value="hospedagem">🏨 Hospedagem</option>
               <option value="combustivel">⛽ Combustível</option>
-              <option value="peca">🔩 Peça / Material</option>
+              <option value="prestador">🧑‍🔧 Prestador</option><option value="peca">🔩 Peça / Material</option>
             </select>
           </div>
         </div>
@@ -307,7 +307,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
     <div class="page" id="page-historico">
       <div style="display:flex;gap:10px;margin-bottom:18px;align-items:flex-end;flex-wrap:wrap">
         <div><label class="flbl" style="display:block">Obra</label><select class="fi" id="h-obra" style="width:200px"></select></div>
-        <div><label class="flbl" style="display:block">Categoria</label><select class="fi" id="h-tipo" style="width:160px"><option value="">Todas</option><option value="despesa">💼 Despesa</option><option value="almoco">🍽 Almoço</option><option value="hospedagem">🏨 Hospedagem</option><option value="combustivel">⛽ Combustível</option><option value="peca">🔩 Peça</option></select></div>
+        <div><label class="flbl" style="display:block">Categoria</label><select class="fi" id="h-tipo" style="width:160px"><option value="">Todas</option><option value="despesa">💼 Despesa</option><option value="almoco">🍽 Almoço</option><option value="hospedagem">🏨 Hospedagem</option><option value="combustivel">⛽ Combustível</option><option value="prestador">🧑‍🔧 Prestador</option><option value="peca">🔩 Peça</option></select></div>
         <div><label class="flbl" style="display:block">De</label><input class="fi" id="h-de" type="date" style="width:145px"></div>
         <div><label class="flbl" style="display:block">Até</label><input class="fi" id="h-ate" type="date" style="width:145px"></div>
         <button class="btn btn-primary" id="btn-filtrar-hist">Filtrar</button>
@@ -395,6 +395,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
 <div id="modal" class="mo hidden"><div class="mbox" id="mbox"></div></div>
 
 <script>
+function iniciarApp(){
 (function(){
 var S={obras:[],lancamentos:[],excluidos:[],pagina:'dashboard',det:null};
 
@@ -424,6 +425,10 @@ function syncChip(status, msg){
 
 function iniciarFirebase(cfg){
   try{
+    if(typeof firebase === 'undefined'){
+      syncChip('erro','Firebase SDK não carregado');
+      return false;
+    }
     if(firebase.apps&&firebase.apps.length){
       firebase.apps.slice().forEach(function(app){try{app.delete();}catch(e){}});
     }
@@ -808,6 +813,7 @@ function rDetalhe(obraId){
   var totAlm=totalCatMes(o.id,mes,'almoco');
   var totHosp=totalCatMes(o.id,mes,'hospedagem');
   var totComb=totalCatMes(o.id,mes,'combustivel');
+  var totPrest=totalCatMes(o.id,mes,'prestador');
   var cor=pctColor(p),cls=pctClass(p);
   var mg=margemLucro(o);
   var d=diasPrazo(o.prazo);
@@ -856,11 +862,12 @@ function rDetalhe(obraId){
       '<div class="det-sc"><div class="det-num">'+fM(totG)+'</div><div class="det-lbl">Total acumulado</div></div>'+
     '</div>'+
     // row 2 — categorias
-    '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px">'+
+    '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:18px">'+
       catSC('despesa',totD,'')+
       catSC('almoco',totAlm,o.b_almoco)+
       catSC('hospedagem',totHosp,o.b_hospedagem)+
       catSC('combustivel',totComb,o.b_combustivel)+
+      catSC('prestador',totPrest,o.b_prestador)+
       catSC('peca',totP,'')+
     '</div>'+
     // barra budget
@@ -991,14 +998,14 @@ function rRelatorio(){
     var makeRows=function(arr){return arr.map(function(l){var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':'';return'<tr><td>'+fD(l.data)+'</td><td>'+l.descricao+'</td><td>'+(l.resp||'—')+'</td><td>'+pb+'</td><td style="font-family:var(--mono);text-align:right">'+fM(l.valor)+'</td></tr>';}).join('');};
     h+='<div class="rel-os"><div class="rel-ot"><span>'+o.nome+'</span><div style="display:flex;gap:14px;font-size:11px;font-family:var(--mono);align-items:center">'+(o.prazo?'<span style="color:var(--text3)">Prazo: '+fD(o.prazo)+'</span>':'')+statusBadge(o.status)+(o.budget?'<span style="color:'+cor+'">'+pp+'% (Budget: '+fM(o.budget)+')</span>':'')+'</div></div><div class="rel-bi">';
     // render por categoria
-    var catsPresentes=['despesa','almoco','hospedagem','combustivel','peca'];
+    var catsPresentes=['despesa','almoco','hospedagem','combustivel','prestador','peca'];
     catsPresentes.forEach(function(cat){
       var arr=lancs.filter(function(l){return l.tipo===cat;});
       if(!arr.length)return;
       var tCat=arr.reduce(function(a,l){return a+Number(l.valor);},0);
       var c=CATEGORIAS[cat]||CATEGORIAS.despesa;
       // verifica se tem limite para esta categoria
-      var budgetCat=cat==='almoco'?o.b_almoco:cat==='hospedagem'?o.b_hospedagem:cat==='combustivel'?o.b_combustivel:'';
+      var budgetCat=cat==='almoco'?o.b_almoco:cat==='hospedagem'?o.b_hospedagem:cat==='combustivel'?o.b_combustivel:cat==='prestador'?o.b_prestador:'';
       var catPct=budgetCat&&Number(budgetCat)>0?((tCat/Number(budgetCat))*100):null;
       var catCorPct=catPct===null?c.cor:catPct>=100?'#dc2626':catPct>=90?'#ea580c':catPct>=70?'#d97706':'#16a34a';
       var limiteTxt=budgetCat&&Number(budgetCat)>0?' · '+(catPct.toFixed(0))+'% do limite ('+fM(budgetCat)+')':'';
@@ -1085,6 +1092,7 @@ function modalObra(id){
       '<div class="fg"><label class="flbl">🍽 Almoço (R$)</label><input class="fi" id="m-b-almoco" type="number" step="0.01" min="0" value="'+(o&&o.b_almoco?o.b_almoco:'')+'" placeholder="Sem limite"></div>'+
       '<div class="fg"><label class="flbl">🏨 Hospedagem (R$)</label><input class="fi" id="m-b-hospedagem" type="number" step="0.01" min="0" value="'+(o&&o.b_hospedagem?o.b_hospedagem:'')+'" placeholder="Sem limite"></div>'+
       '<div class="fg"><label class="flbl">⛽ Combustível (R$)</label><input class="fi" id="m-b-combustivel" type="number" step="0.01" min="0" value="'+(o&&o.b_combustivel?o.b_combustivel:'')+'" placeholder="Sem limite"></div>'+
+      '<div class="fg"><label class="flbl">🧑‍🔧 Prestador (R$)</label><input class="fi" id="m-b-prestador" type="number" step="0.01" min="0" value="'+(o&&o.b_prestador?o.b_prestador:'')+'" placeholder="Sem limite"></div>'+
     '</div>'+
     '<div class="fg"><label class="flbl">Contrato Fechado (R$) — Valor vendido ao cliente</label><input class="fi" id="m-contrato" type="number" step="0.01" min="0" value="'+(o&&o.contrato?o.contrato:'')+'" placeholder="0,00"></div>'+
     '<div class="mactions">'+
@@ -1132,7 +1140,7 @@ function modalLanc(obraId){
   openModal(
     '<div class="mtitle">Novo Lançamento</div>'+
     '<div class="fl"><div class="fg"><label class="flbl">Obra</label><select class="fi" id="ml-obra">'+opts+'</select></div>'+
-    '<div class="fg"><label class="flbl">Categoria</label><select class="fi" id="ml-tipo"><option value="despesa">💼 Despesa / Serviço</option><option value="almoco">🍽 Almoço / Alimentação</option><option value="hospedagem">🏨 Hospedagem</option><option value="combustivel">⛽ Combustível</option><option value="peca">🔩 Peça / Material</option></select></div></div>'+
+    '<div class="fg"><label class="flbl">Categoria</label><select class="fi" id="ml-tipo"><option value="despesa">💼 Despesa / Serviço</option><option value="almoco">🍽 Almoço / Alimentação</option><option value="hospedagem">🏨 Hospedagem</option><option value="combustivel">⛽ Combustível</option><option value="prestador">🧑‍🔧 Prestador</option><option value="peca">🔩 Peça / Material</option></select></div></div>'+
     '<div class="fg"><label class="flbl">Descrição</label><input class="fi" id="ml-desc" placeholder="Ex: Câmeras externas – 6un"></div>'+
     '<div class="fl"><div class="fg"><label class="flbl">Responsável</label><input class="fi" id="ml-resp" placeholder="Opcional"></div>'+
     '<div class="fg"><label class="flbl">Forma de Pagamento</label><select class="fi" id="ml-pgto"><option value="avista">💵 À vista</option><option value="3x">📆 3x</option><option value="5x">📆 5x</option></select></div></div>'+
@@ -1178,9 +1186,10 @@ function saveObra(id){
   var bAlmoco=document.getElementById('m-b-almoco').value;
   var bHosp=document.getElementById('m-b-hospedagem').value;
   var bComb=document.getElementById('m-b-combustivel').value;
+  var bPrest=document.getElementById('m-b-prestador').value;
   if(!nome){alert('Informe o nome da obra');return;}
   if(!budget||Number(budget)<=0){alert('Informe um budget válido');return;}
-  var dados={nome:nome,budget:budget,prazo:prazo||'',inicio:inicio||'',status:status,custo_previsto:custo||'',contrato:contrato||'',b_almoco:bAlmoco||'',b_hospedagem:bHosp||'',b_combustivel:bComb||''};
+  var dados={nome:nome,budget:budget,prazo:prazo||'',inicio:inicio||'',status:status,custo_previsto:custo||'',contrato:contrato||'',b_almoco:bAlmoco||'',b_hospedagem:bHosp||'',b_combustivel:bComb||'',b_prestador:bPrest||''};
   if(id){
     var o=findO(id);
     Object.assign(o,dados);
@@ -1205,6 +1214,7 @@ var CATEGORIAS={
   almoco:{label:'Almoço',icon:'🍽',cor:'#b45309',bg:'#fffbeb',border:'#fcd34d'},
   hospedagem:{label:'Hospedagem',icon:'🏨',cor:'#0e7490',bg:'#ecfeff',border:'#a5f3fc'},
   combustivel:{label:'Combustível',icon:'⛽',cor:'#7c3aed',bg:'#faf5ff',border:'#ddd6fe'},
+  prestador:{label:'Prestador',icon:'🧑‍🔧',cor:'#be185d',bg:'#fdf2f8',border:'#f9a8d4'},
   peca:{label:'Peça / Material',icon:'🔩',cor:'#6d28d9',bg:'#faf5ff',border:'#ddd6fe'}
 };
 function catLabel(tipo){var c=CATEGORIAS[tipo];return c?c.icon+' '+c.label:tipo;}
@@ -1225,7 +1235,7 @@ function checkAlerta(obraId,mes){
   else if(p>=90) msgs.push({nivel:'warn90',txt:'🟠 Budget total em '+p.toFixed(0)+'%!\nSaldo restante: '+fM(Math.max(0,Number(o.budget)-totalMesObra(obraId,mes)))});
   else if(p>=70) msgs.push({nivel:'warn70',txt:'🟡 Budget total em '+p.toFixed(0)+'% — fique de olho!'});
   // categorias especiais
-  var cats=[{cat:'almoco',budget:o.b_almoco,nome:'Almoço'},{cat:'hospedagem',budget:o.b_hospedagem,nome:'Hospedagem'},{cat:'combustivel',budget:o.b_combustivel,nome:'Combustível'}];
+  var cats=[{cat:'almoco',budget:o.b_almoco,nome:'Almoço'},{cat:'hospedagem',budget:o.b_hospedagem,nome:'Hospedagem'},{cat:'combustivel',budget:o.b_combustivel,nome:'Combustível'},{cat:'prestador',budget:o.b_prestador,nome:'Prestador'}];
   cats.forEach(function(c){
     if(!c.budget||Number(c.budget)<=0)return;
     var gasto=totalCatMes(obraId,mes,c.cat);
@@ -1616,6 +1626,27 @@ if(_fbCfg&&_fbCfg.apiKey){
 }
 
 })();
+} // fim iniciarApp
+
+// Garante que Firebase SDK está disponível antes de iniciar
+if(typeof firebase !== 'undefined'){
+  iniciarApp();
+} else {
+  document.addEventListener('DOMContentLoaded', function(){
+    var tentativas = 0;
+    var aguardar = setInterval(function(){
+      tentativas++;
+      if(typeof firebase !== 'undefined'){
+        clearInterval(aguardar);
+        iniciarApp();
+      } else if(tentativas > 20){
+        clearInterval(aguardar);
+        // Firebase não carregou (offline?) — inicia sem ele
+        iniciarApp();
+      }
+    }, 100);
+  });
+}
 </script>
 <!-- PWA Service Worker -->
 <script>
