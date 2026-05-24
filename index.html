@@ -622,7 +622,6 @@ var USUARIO_ATUAL={id:'',nome:'',email:'',foto:''};
 var AUTH_READY = false;
 
 function iniciarAuth(){
-  // Verifica se o ambiente suporta Firebase Auth
   var proto = window.location.protocol;
   var host  = window.location.hostname;
   var suportaAuth = (proto === 'https:' || proto === 'chrome-extension:') &&
@@ -630,50 +629,59 @@ function iniciarAuth(){
                     typeof window.localStorage !== 'undefined';
 
   if(!suportaAuth){
-    // Ambiente local/preview — entra direto sem login Google
-    USUARIO_ATUAL = {id:'local', nome:'Usuário', email:'', foto:''};
-    document.getElementById('login-screen').style.display = 'none';
-    if(!AUTH_READY){ AUTH_READY = true; iniciarAppComAuth(); }
+    USUARIO_ATUAL = {id:'local',nome:'Usuário',email:'',foto:''};
+    document.getElementById('login-screen').style.display='none';
+    if(!AUTH_READY){AUTH_READY=true;iniciarAppComAuth();}
     return;
   }
 
   var auth;
-  try{ auth = firebase.auth(); }
+  try{auth=firebase.auth();}
   catch(e){
-    // Auth SDK não disponível — entra direto
-    USUARIO_ATUAL = {id:'local', nome:'Usuário', email:'', foto:''};
-    document.getElementById('login-screen').style.display = 'none';
-    if(!AUTH_READY){ AUTH_READY = true; iniciarAppComAuth(); }
+    USUARIO_ATUAL={id:'local',nome:'Usuário',email:'',foto:''};
+    document.getElementById('login-screen').style.display='none';
+    if(!AUTH_READY){AUTH_READY=true;iniciarAppComAuth();}
     return;
   }
 
   auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
 
-  document.getElementById('btn-google-login').addEventListener('click', function(){
-    var st = document.getElementById('login-status');
-    st.textContent = 'Aguardando autenticação Google...';
-    var provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider).catch(function(e){
-      st.textContent = '⚠ ' + e.message;
-    });
+  // Mobile usa redirect, desktop usa popup
+  var isMobile=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+  // Processa resultado de redirect ao voltar do login Google no mobile
+  auth.getRedirectResult().catch(function(e){
+    var st=document.getElementById('login-status');
+    if(st)st.textContent='⚠ '+e.message;
+  });
+
+  document.getElementById('btn-google-login').addEventListener('click',function(){
+    var st=document.getElementById('login-status');
+    if(st)st.textContent='Iniciando login Google...';
+    var provider=new firebase.auth.GoogleAuthProvider();
+    if(isMobile){
+      auth.signInWithRedirect(provider).catch(function(e){if(st)st.textContent='⚠ '+e.message;});
+    } else {
+      auth.signInWithPopup(provider).catch(function(e){if(st)st.textContent='⚠ '+e.message;});
+    }
   });
 
   auth.onAuthStateChanged(function(user){
     if(user){
-      USUARIO_ATUAL = {
-        id:    user.uid,
-        nome:  user.displayName || user.email,
-        email: user.email,
-        foto:  user.photoURL || ''
+      USUARIO_ATUAL={
+        id:user.uid,
+        nome:user.displayName||user.email,
+        email:user.email,
+        foto:user.photoURL||''
       };
-      localStorage.setItem('obras_usuario_nome', USUARIO_ATUAL.nome);
-      localStorage.setItem('obras_usuario_email', USUARIO_ATUAL.email);
-      document.getElementById('login-screen').style.display = 'none';
+      localStorage.setItem('obras_usuario_nome',USUARIO_ATUAL.nome);
+      localStorage.setItem('obras_usuario_email',USUARIO_ATUAL.email);
+      document.getElementById('login-screen').style.display='none';
       atualizarChipUsuario();
-      if(!AUTH_READY){ AUTH_READY = true; iniciarAppComAuth(); }
+      if(!AUTH_READY){AUTH_READY=true;iniciarAppComAuth();}
     } else {
-      document.getElementById('login-screen').style.display = 'flex';
-      AUTH_READY = false;
+      document.getElementById('login-screen').style.display='flex';
+      AUTH_READY=false;
     }
   });
 }
