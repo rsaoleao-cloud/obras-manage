@@ -550,30 +550,14 @@ select.fi option{background:var(--bg2);color:var(--text)}
     <!-- CONFIG -->
     <div class="page" id="page-config">
       <div style="max-width:580px">
-        <!-- FIREBASE CONFIG -->
-        <div class="fcard" style="margin-bottom:14px;border-color:#bfdbfe;background:#f8faff">
-          <div class="ftitle" style="color:#1d4ed8">☁ Banco de Dados Firebase (Google)</div>
-          <p style="font-size:12px;color:#374151;line-height:1.7;margin-bottom:14px">
-            Cole aqui as credenciais do seu projeto Firebase para ativar o armazenamento em nuvem compartilhado. Todos os usuários com o link acessam os mesmos dados em tempo real.
-          </p>
-          <div class="fl">
-            <div class="fg"><label class="flbl">API Key</label><input class="fi" id="fb-apikey" placeholder="AIzaSy..." style="font-size:12px;font-family:var(--mono)"></div>
-            <div class="fg"><label class="flbl">Project ID</label><input class="fi" id="fb-projectid" placeholder="meu-projeto" style="font-size:12px;font-family:var(--mono)"></div>
-          </div>
-          <div class="fl">
-            <div class="fg"><label class="flbl">Auth Domain</label><input class="fi" id="fb-authdomain" placeholder="meu-projeto.firebaseapp.com" style="font-size:12px;font-family:var(--mono)"></div>
-            <div class="fg"><label class="flbl">Storage Bucket</label><input class="fi" id="fb-storagebucket" placeholder="meu-projeto.firebasestorage.app" style="font-size:12px;font-family:var(--mono)"></div>
-          </div>
-          <div class="fl">
-            <div class="fg"><label class="flbl">Messaging Sender ID</label><input class="fi" id="fb-senderid" placeholder="225604366115" style="font-size:12px;font-family:var(--mono)"></div>
-            <div class="fg"><label class="flbl">App ID</label><input class="fi" id="fb-appid" placeholder="1:xxx:web:xxx" style="font-size:12px;font-family:var(--mono)"></div>
-          </div>
-          <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
-            <button class="btn btn-primary" id="btn-fb-salvar">💾 Conectar Firebase</button>
+        <!-- STATUS FIREBASE (automático) -->
+        <div class="fcard" style="margin-bottom:14px;border-color:var(--border2)">
+          <div class="ftitle">☁ Conexão Firebase</div>
+          <div id="fb-status-msg" style="font-size:13px;font-family:var(--mono);padding:8px 0"></div>
+          <div style="display:flex;gap:7px;margin-top:8px">
             <button class="btn" id="btn-fb-testar">🔌 Testar conexão</button>
-            <button class="btn btn-danger" id="btn-fb-remover">Desconectar</button>
+            <button class="btn" id="btn-sync">↻ Sincronizar</button>
           </div>
-          <div id="fb-status-msg" style="margin-top:10px;font-size:11px;font-family:var(--mono);min-height:16px"></div>
         </div>
         <div class="fcard" style="margin-bottom:14px">
           <div class="ftitle">Sistema</div>
@@ -1602,28 +1586,14 @@ function rConfig(){
   document.getElementById('cfg-obras').textContent=S.obras.length;
   document.getElementById('cfg-lancs').textContent=S.lancamentos.length;
   document.getElementById('cfg-data').textContent=fD(hoje());
-  // Sempre usa FB_DEFAULT como base, sobreposto pelo que estiver salvo
-  var cfg=fbCarregarConfig()||FB_DEFAULT;
-  var f1=document.getElementById('fb-apikey');
-  var f2=document.getElementById('fb-projectid');
-  var f3=document.getElementById('fb-appid');
-  var f4=document.getElementById('fb-authdomain');
-  var f5=document.getElementById('fb-storagebucket');
-  var f6=document.getElementById('fb-senderid');
-  if(f1)f1.value=cfg.apiKey||FB_DEFAULT.apiKey;
-  if(f2)f2.value=cfg.projectId||FB_DEFAULT.projectId;
-  if(f4)f4.value=cfg.authDomain||FB_DEFAULT.authDomain;
-  if(f5)f5.value=cfg.storageBucket||FB_DEFAULT.storageBucket;
-  if(f6)f6.value=cfg.messagingSenderId||FB_DEFAULT.messagingSenderId;
-  if(f3)f3.value=cfg.appId||FB_DEFAULT.appId;
   var msg=document.getElementById('fb-status-msg');
   if(msg){
     if(FB){
       msg.style.color='#10b981';
-      msg.textContent='✅ Firebase conectado e ativo — Projeto: '+cfg.projectId;
+      msg.textContent='✅ Firebase conectado — Projeto: '+FB_DEFAULT.projectId;
     } else {
       msg.style.color='#f59e0b';
-      msg.textContent='⚠ Não conectado. Clique em "Conectar Firebase".';
+      msg.textContent='⚠ Não conectado. Clique em "Testar conexão".';
     }
   }
 }
@@ -2164,57 +2134,20 @@ document.getElementById('btn-sync').addEventListener('click',function(){
   syncFromCloud(function(){renderPage(S.pagina);renderSidebarObras();});
 });
 
-// Firebase config UI (delegado — página de config renderiza dinamicamente)
+// Firebase config UI — só testar conexão (credenciais são automáticas)
 document.addEventListener('click',function(e){
-  if(e.target&&e.target.id==='btn-fb-salvar'){
-    var cfg={
-      apiKey:            document.getElementById('fb-apikey').value.trim(),
-      authDomain:        document.getElementById('fb-authdomain').value.trim(),
-      projectId:         document.getElementById('fb-projectid').value.trim(),
-      storageBucket:     document.getElementById('fb-storagebucket').value.trim(),
-      messagingSenderId: document.getElementById('fb-senderid').value.trim(),
-      appId:             document.getElementById('fb-appid').value.trim()
-    };
-    if(!cfg.apiKey||!cfg.projectId||!cfg.appId){
-      document.getElementById('fb-status-msg').textContent='⚠ Preencha todos os campos';
-      document.getElementById('fb-status-msg').style.color='#dc2626';
-      return;
-    }
-    fbSalvarConfig(cfg);
-    var ok=iniciarFirebase(cfg);
-    var msg=document.getElementById('fb-status-msg');
-    if(ok){
-      msg.style.color='#166534';
-      msg.textContent='✅ Conectado! Sincronizando dados...';
-      syncFromCloud(function(){
-        ativarListeners();
-        renderPage(S.pagina);
-        renderSidebarObras();
-        msg.textContent='✅ Firebase ativo — dados sincronizados!';
-      });
-    } else {
-      msg.style.color='#dc2626';
-      msg.textContent='❌ Erro ao conectar. Verifique as credenciais.';
-    }
-  }
   if(e.target&&e.target.id==='btn-fb-testar'){
     var msg=document.getElementById('fb-status-msg');
-    if(!FB){msg.style.color='#dc2626';msg.textContent='⚠ Firebase não conectado. Salve as credenciais primeiro.';return;}
+    if(!msg)return;
+    if(!FB){
+      msg.style.color='#f59e0b';
+      msg.textContent='⚠ Firebase não inicializado. Recarregue a página.';
+      return;
+    }
     msg.style.color='#1d4ed8';msg.textContent='Testando...';
     FB.collection('obras').limit(1).get()
-      .then(function(){msg.style.color='#166534';msg.textContent='✅ Conexão OK! Firebase funcionando.'})
-      .catch(function(e){msg.style.color='#dc2626';msg.textContent='❌ Erro: '+e.message;});
-  }
-  if(e.target&&e.target.id==='btn-fb-remover'){
-    if(!confirm('Desconectar do Firebase? Os dados locais permanecem.'))return;
-    fbRemoverConfig();
-    if(_unsubObras)_unsubObras();
-    if(_unsubLancs)_unsubLancs();
-    FB=null;
-    syncChip('local','Modo local');
-    document.getElementById('btn-sync').style.display='none';
-    alert('Firebase desconectado. O sistema voltou ao modo local.');
-    rConfig();
+      .then(function(){msg.style.color='#10b981';msg.textContent='✅ Firebase OK — Projeto: '+FB_DEFAULT.projectId;})
+      .catch(function(err){msg.style.color='#ef4444';msg.textContent='❌ Erro: '+err.message;});
   }
 });
 
