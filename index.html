@@ -400,13 +400,28 @@ function iniciarApp(){
 var S={obras:[],lancamentos:[],excluidos:[],pagina:'dashboard',det:null};
 
 // ============================================================
-// FIREBASE — armazenamento em nuvem
+// FIREBASE — credenciais fixas no código
 // ============================================================
-var FB = null;   // instância do Firestore
+var FB = null;
 var FB_CFG_KEY = 'obras_fb_config';
 
+// Credenciais fixas — não precisam ser configuradas manualmente
+var FB_DEFAULT = {
+  apiKey:            'AIzaSyDD5wK_P1LPgMK4yk7JBZeE8jT_xNBSykg',
+  authDomain:        'obras-manager.firebaseapp.com',
+  projectId:         'obras-manager',
+  storageBucket:     'obras-manager.firebasestorage.app',
+  messagingSenderId: '225604366115',
+  appId:             '1:225604366115:web:9cfed5ee3901fd278de696'
+};
+
 function fbSalvarConfig(cfg){ localStorage.setItem(FB_CFG_KEY, JSON.stringify(cfg)); }
-function fbCarregarConfig(){ try{ var d=localStorage.getItem(FB_CFG_KEY); return d?JSON.parse(d):null; }catch(e){return null;} }
+function fbCarregarConfig(){ 
+  try{ 
+    var d=localStorage.getItem(FB_CFG_KEY); 
+    return d ? JSON.parse(d) : FB_DEFAULT; // usa padrão se não tiver nada salvo
+  }catch(e){return FB_DEFAULT;} 
+}
 function fbRemoverConfig(){ localStorage.removeItem(FB_CFG_KEY); }
 
 function syncChip(status, msg){
@@ -1029,7 +1044,7 @@ function rConfig(){
   document.getElementById('cfg-obras').textContent=S.obras.length;
   document.getElementById('cfg-lancs').textContent=S.lancamentos.length;
   document.getElementById('cfg-data').textContent=fD(hoje());
-  var cfg=fbCarregarConfig();
+  var cfg=fbCarregarConfig()||FB_DEFAULT;
   if(cfg){
     var f1=document.getElementById('fb-apikey');
     var f2=document.getElementById('fb-projectid');
@@ -1608,20 +1623,16 @@ ld();
 S.obras.forEach(function(o){if(!o.budget&&o.orcamento)o.budget=o.orcamento;if(!o.status)o.status='andamento';});
 if(!S.excluidos)S.excluidos=[];
 
-// Auto-conectar Firebase se já tem config salva
-var _fbCfg=fbCarregarConfig();
-if(_fbCfg&&_fbCfg.apiKey){
-  var _ok=iniciarFirebase(_fbCfg);
-  if(_ok){
-    syncFromCloud(function(){
-      ativarListeners();
-      showPage('dashboard');
-    });
-  } else {
+// Auto-conectar Firebase sempre com credenciais fixas
+var _fbCfg = fbCarregarConfig(); // retorna FB_DEFAULT se não tiver config salva
+var _ok = iniciarFirebase(_fbCfg);
+if(_ok){
+  syncFromCloud(function(){
+    ativarListeners();
     showPage('dashboard');
-  }
+  });
 } else {
-  syncChip('local','Modo local — configure Firebase em ⚙');
+  syncChip('local','Modo local');
   showPage('dashboard');
 }
 
