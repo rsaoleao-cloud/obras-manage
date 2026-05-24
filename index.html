@@ -29,10 +29,18 @@
   --sidebar:268px;--header:58px;
 }
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px}
-.app{display:grid;grid-template-columns:var(--sidebar) 1fr;grid-template-rows:var(--header) 1fr;height:100vh;overflow:hidden}
+.app{display:grid;grid-template-columns:var(--sidebar) 1fr;grid-template-rows:var(--header) 1fr;height:100vh;overflow:hidden;transition:grid-template-columns .25s ease}
+.app.sidebar-oculta{grid-template-columns:0px 1fr}
 
 /* SIDEBAR */
-.sidebar{grid-row:1/3;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;box-shadow:1px 0 4px rgba(0,0,0,.05)}
+.sidebar{grid-row:1/3;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;box-shadow:1px 0 4px rgba(0,0,0,.05);transition:transform .25s ease,width .25s ease;width:var(--sidebar)}
+.app.sidebar-oculta .sidebar{transform:translateX(-100%);width:0;border:none}
+/* Overlay mobile */
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:50}
+.app.sidebar-oculta .sidebar-overlay{display:none}
+/* Toggle button */
+.btn-toggle-sidebar{background:none;border:none;cursor:pointer;font-size:20px;padding:4px 8px;color:var(--text2);border-radius:var(--rsm);transition:background .15s;line-height:1;flex-shrink:0}
+.btn-toggle-sidebar:hover{background:var(--bg3)}
 .logo{padding:18px 18px 14px;border-bottom:1px solid var(--border)}
 .logo-title{font-family:var(--serif);font-size:19px;font-weight:700;color:var(--accent)}
 .logo-sub{font-size:10px;color:var(--text4);font-family:var(--mono);margin-top:2px;letter-spacing:.5px}
@@ -199,7 +207,8 @@ select.fi option{background:var(--bg2);color:var(--text)}
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 </head>
 <body>
-<div class="app">
+<div class="app" id="app">
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
   <aside class="sidebar">
     <div class="logo">
       <div class="logo-title">⚒ Obras Manager</div>
@@ -220,7 +229,10 @@ select.fi option{background:var(--bg2);color:var(--text)}
   </aside>
 
   <header class="header">
-    <div class="hdr-title" id="hdr-title">Dashboard</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" title="Mostrar/ocultar menu">☰</button>
+      <div class="hdr-title" id="hdr-title">Dashboard</div>
+    </div>
     <div class="hdr-right">
       <span class="date-chip" id="date-chip"></span>
       <span id="sync-chip" style="font-size:11px;font-family:var(--mono);padding:4px 10px;border-radius:4px;border:1px solid #e5e7eb;background:#f9fafb;color:#6b7280">💾 Local</span>
@@ -1492,6 +1504,36 @@ var dn=new Date();
 var dias=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 document.getElementById('date-chip').textContent=dias[dn.getDay()]+', '+fD(hoje());
 
+// Sidebar toggle
+var sidebarAberta = true;
+document.getElementById('btn-toggle-sidebar').addEventListener('click', function(){
+  sidebarAberta = !sidebarAberta;
+  var app = document.getElementById('app');
+  var btn = document.getElementById('btn-toggle-sidebar');
+  if(sidebarAberta){
+    app.classList.remove('sidebar-oculta');
+    btn.textContent = '☰';
+    btn.title = 'Ocultar menu';
+  } else {
+    app.classList.add('sidebar-oculta');
+    btn.textContent = '☰';
+    btn.title = 'Mostrar menu';
+  }
+});
+// Fechar sidebar ao clicar no overlay
+document.getElementById('sidebar-overlay').addEventListener('click', function(){
+  sidebarAberta = false;
+  document.getElementById('app').classList.add('sidebar-oculta');
+});
+// Fechar sidebar ao clicar em item do menu (mobile)
+document.querySelectorAll('.ni').forEach(function(ni){
+  ni.addEventListener('click', function(){
+    if(window.innerWidth < 768){
+      sidebarAberta = false;
+      document.getElementById('app').classList.add('sidebar-oculta');
+    }
+  });
+});
 // Sync manual
 document.getElementById('btn-sync').addEventListener('click',function(){
   syncFromCloud(function(){renderPage(S.pagina);renderSidebarObras();});
