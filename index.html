@@ -354,26 +354,9 @@ select.fi option{background:var(--bg2);color:var(--text)}
 <!-- Firebase SDKs com defer para garantir carregamento -->
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 </head>
 <body>
 
-<!-- TELA DE LOGIN GOOGLE -->
-<div id="login-screen" style="position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999">
-  <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(30,144,255,.12) 0%,transparent 60%);pointer-events:none"></div>
-  <div style="background:var(--card);border:1px solid var(--border2);border-radius:16px;padding:42px 36px;width:100%;max-width:380px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6);position:relative">
-    <div style="width:58px;height:58px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;color:#fff;margin:0 auto 16px;letter-spacing:-1px">S8</div>
-    <div style="font-size:21px;font-weight:700;color:var(--text);margin-bottom:4px;font-family:var(--serif)">SP8 Obras Manager</div>
-    <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:32px;letter-spacing:.6px">SISTEMA DE GESTÃO DE PROJETOS</div>
-    <div style="display:inline-block;background:rgba(30,144,255,.15);border:1px solid rgba(30,144,255,.3);border-radius:4px;padding:3px 10px;font-size:10px;font-family:var(--mono);color:var(--accent);margin-bottom:24px;letter-spacing:.5px">v5.1 · BUILD 2025-05-24</div>
-    <button id="btn-google-login" style="display:inline-flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px 20px;border-radius:8px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-family:var(--font);font-size:14px;font-weight:500;cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent">
-      <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.8 2.5 30.2 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.8 6C12.4 13 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17z"/><path fill="#FBBC05" d="M10.4 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.9-4.7l-7.8-6A23.9 23.9 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l7.8-6z"/><path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.5-5.8c-2 1.4-4.6 2.3-7.7 2.3-6.2 0-11.5-4.2-13.4-9.8l-7.8 6C6.6 42.6 14.6 48 24 48z"/></svg>
-      Entrar com Google
-    </button>
-    <div id="login-status" style="margin-top:14px;font-size:11px;font-family:var(--mono);color:var(--text3);min-height:16px"></div>
-    <div style="font-size:10px;color:var(--text4);margin-top:20px;font-family:var(--mono)">© SP8 Tecnologia · Acesso restrito</div>
-  </div>
-</div>
 
 <div class="app" id="app">
   <div class="sidebar-overlay" id="sidebar-overlay"></div>
@@ -407,7 +390,6 @@ select.fi option{background:var(--bg2);color:var(--text)}
         <span class="user-avatar-sm" id="user-avatar-letter">?</span>
         <span id="user-nome-chip">—</span>
       </span>
-      <button id="btn-logout" style="display:none;background:none;border:1px solid var(--border);border-radius:var(--rsm);padding:4px 9px;font-size:10px;color:var(--text3);cursor:pointer;font-family:var(--mono)" title="Sair">Sair</button>
       <span class="date-chip" id="date-chip"></span>
       <span id="sync-chip" style="font-size:11px;font-family:var(--mono);padding:4px 10px;border-radius:4px;border:1px solid #e5e7eb;background:#f9fafb;color:#6b7280">💾 Local</span>
       <button class="btn btn-sm" id="btn-sync" title="Sincronizar agora" style="display:none">↻ Sync</button>
@@ -619,81 +601,15 @@ var USUARIO_ATUAL={id:'',nome:'',email:'',foto:''};
 // ============================================================
 // FIREBASE AUTH — Google Sign-In
 // ============================================================
-var AUTH_READY = false;
 
-function iniciarAuth(){
-  var proto = window.location.protocol;
-  var host  = window.location.hostname;
-  var suportaAuth = (proto === 'https:' || proto === 'chrome-extension:') &&
-                    host !== '' && host !== 'localhost' &&
-                    typeof window.localStorage !== 'undefined';
-
-  if(!suportaAuth){
-    USUARIO_ATUAL = {id:'local',nome:'Usuário',email:'',foto:''};
-    document.getElementById('login-screen').style.display='none';
-    if(!AUTH_READY){AUTH_READY=true;iniciarAppComAuth();}
-    return;
-  }
-
-  var auth;
-  try{auth=firebase.auth();}
-  catch(e){
-    USUARIO_ATUAL={id:'local',nome:'Usuário',email:'',foto:''};
-    document.getElementById('login-screen').style.display='none';
-    if(!AUTH_READY){AUTH_READY=true;iniciarAppComAuth();}
-    return;
-  }
-
-  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
-
-  // Mobile usa redirect, desktop usa popup
-  var isMobile=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-
-  // Processa resultado de redirect ao voltar do login Google no mobile
-  auth.getRedirectResult().catch(function(e){
-    var st=document.getElementById('login-status');
-    if(st)st.textContent='⚠ '+e.message;
-  });
-
-  document.getElementById('btn-google-login').addEventListener('click',function(){
-    var st=document.getElementById('login-status');
-    if(st)st.textContent='Iniciando login Google...';
-    var provider=new firebase.auth.GoogleAuthProvider();
-    if(isMobile){
-      auth.signInWithRedirect(provider).catch(function(e){if(st)st.textContent='⚠ '+e.message;});
-    } else {
-      auth.signInWithPopup(provider).catch(function(e){if(st)st.textContent='⚠ '+e.message;});
-    }
-  });
-
-  auth.onAuthStateChanged(function(user){
-    if(user){
-      USUARIO_ATUAL={
-        id:user.uid,
-        nome:user.displayName||user.email,
-        email:user.email,
-        foto:user.photoURL||''
-      };
-      localStorage.setItem('obras_usuario_nome',USUARIO_ATUAL.nome);
-      localStorage.setItem('obras_usuario_email',USUARIO_ATUAL.email);
-      document.getElementById('login-screen').style.display='none';
-      atualizarChipUsuario();
-      if(!AUTH_READY){AUTH_READY=true;iniciarAppComAuth();}
-    } else {
-      document.getElementById('login-screen').style.display='flex';
-      AUTH_READY=false;
-    }
-  });
-}
+function iniciarAuth(){ /* auth removido - entra direto */ }
 
 function atualizarChipUsuario(){
   var chip = document.getElementById('user-chip');
   var letter = document.getElementById('user-avatar-letter');
   var nome = document.getElementById('user-nome-chip');
-  var btnLogout = document.getElementById('btn-logout');
   if(!chip) return;
   chip.style.display = 'inline-flex';
-  if(btnLogout) btnLogout.style.display = 'inline-block';
   if(USUARIO_ATUAL.foto){
     letter.innerHTML = '<img src="'+USUARIO_ATUAL.foto+'" style="width:24px;height:24px;border-radius:50%;object-fit:cover">';
   } else {
@@ -2167,17 +2083,6 @@ document.querySelectorAll('.ni').forEach(function(ni){
     }
   });
 });
-// Logout
-document.getElementById('btn-logout').addEventListener('click',function(){
-  if(!confirm('Deseja sair da conta Google?'))return;
-  if(typeof firebase!=='undefined'&&firebase.auth){
-    firebase.auth().signOut().then(function(){
-      USUARIO_ATUAL={id:'',nome:'',email:'',foto:''};
-      document.getElementById('user-chip').style.display='none';
-      document.getElementById('btn-logout').style.display='none';
-    });
-  }
-});
 
 // Sync manual
 document.getElementById('btn-sync').addEventListener('click',function(){
@@ -2214,7 +2119,7 @@ if(!_cfgSalva){
   localStorage.setItem(FB_CFG_KEY, JSON.stringify(FB_DEFAULT));
 }
 
-// Inicia Firebase e Auth
+// Inicia Firebase e abre app diretamente (sem autenticação)
 var _fbCfg = fbCarregarConfig();
 if(_fbCfg && _fbCfg.apiKey){
   try{
@@ -2229,19 +2134,15 @@ if(_fbCfg && _fbCfg.apiKey){
       });
     }
     FB = firebase.firestore();
-    syncChip('ok','Firebase conectado');
+    syncChip('sync','Conectando...');
     document.getElementById('btn-sync').style.display='inline-block';
-    iniciarAuth();
+    syncFromCloud(function(){ ativarListeners(); showPage('dashboard'); });
   }catch(e){
     FB = null;
     syncChip('erro','Erro: '+e.message);
-    document.getElementById('login-screen').style.display='none';
     showPage('dashboard');
   }
 } else {
-  // Sem Firebase — modo local sem login
-  USUARIO_ATUAL = {id:'local',nome:'Usuário',email:'',foto:''};
-  document.getElementById('login-screen').style.display='none';
   syncChip('local','Modo local');
   showPage('dashboard');
 }
@@ -2258,7 +2159,7 @@ function aguardarFirebaseEIniciar(){
     var sdkOk = typeof firebase !== 'undefined' &&
                 typeof firebase.app !== 'undefined' &&
                 typeof firebase.firestore !== 'undefined' &&
-                typeof firebase.auth !== 'undefined';
+                true /* auth removido */;
     if(sdkOk){
       clearInterval(timer);
       iniciarApp();
