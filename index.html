@@ -1457,16 +1457,13 @@ function atualizarPreview(){
   if(tipo==='avista'||!valor){preview.innerHTML='';return;}
 
   var parcVal=valor/n;
-  var dataParts=dataVal.split('-');
   var rows='';
   for(var i=0;i<n;i++){
-    var mo=parseInt(dataParts[1])-1+i;
-    var yr=parseInt(dataParts[0]);
-    while(mo>11){mo-=12;yr++;}
-    var mLabel=MESES[mo]+'/'+yr;
-    rows+='<div class="parc-row"><span>Parcela '+(i+1)+'/'+n+' · '+mLabel+'</span><span>'+fM(parcVal)+'</span></div>';
+    var r=addDias(dataVal, i*30);
+    var mLabel=fD(r.data)+' ('+mesLabel(r.mes)+')';
+    rows+='<div class="parc-row"><span>'+i+1+'/'+n+' · '+mLabel+'</span><span>'+fM(parcVal)+'</span></div>';
   }
-  rows+='<div class="parc-row"><span>Total</span><span>'+fM(valor)+'</span></div>';
+  rows+='<div class="parc-row" style="font-weight:600"><span>Total</span><span>'+fM(valor)+'</span></div>';
   preview.innerHTML='<div class="parc-preview">'+rows+'</div>';
 }
 
@@ -1844,14 +1841,12 @@ function atualizarPreviewModal(){
   var n=tipo==='avista'?1:tipo==='3x'?3:5;
   if(tipo==='avista'||!valor){document.getElementById('ml-preview').innerHTML='';return;}
   var parcVal=valor/n;
-  var dp=dataVal.split('-');
   var rows='';
   for(var i=0;i<n;i++){
-    var mo=parseInt(dp[1])-1+i;var yr=parseInt(dp[0]);
-    while(mo>11){mo-=12;yr++;}
-    rows+='<div class="parc-row"><span>Parcela '+(i+1)+'/'+n+' · '+MESES[mo]+'/'+yr+'</span><span>'+fM(parcVal)+'</span></div>';
+    var r=addDias(dataVal, i*30);
+    rows+='<div class="parc-row"><span>'+i+1+'/'+n+' · '+fD(r.data)+' ('+mesLabel(r.mes)+')</span><span>'+fM(parcVal)+'</span></div>';
   }
-  rows+='<div class="parc-row"><span>Total</span><span>'+fM(valor)+'</span></div>';
+  rows+='<div class="parc-row" style="font-weight:600"><span>Total</span><span>'+fM(valor)+'</span></div>';
   document.getElementById('ml-preview').innerHTML='<div class="parc-preview" style="margin-top:8px">'+rows+'</div>';
 }
 
@@ -1999,29 +1994,47 @@ function checkAlerta(obraId,mes){
   }
 }
 
+// Adiciona N dias a uma data string YYYY-MM-DD e retorna nova data e mês
+function addDias(dataStr, dias){
+  var d=new Date(dataStr+'T12:00:00');
+  d.setDate(d.getDate()+dias);
+  var yr=d.getFullYear();
+  var mo=pad(d.getMonth()+1);
+  var dy=pad(d.getDate());
+  return {data:yr+'-'+mo+'-'+dy, mes:yr+'-'+mo};
+}
+
 function criarLancamentos(obraId,tipo,desc,resp,valor,data,pgto,nparcelas){
   var n=pgto==='avista'?1:pgto==='3x'?3:pgto==='5x'?5:parseInt(nparcelas)||1;
   var parcVal=Number(valor)/n;
-  var dp=data.split('-');
-  // Verifica se algum mês está fechado antes de criar qualquer parcela
-  for(var check=0;check<n;check++){
-    var moCheck=parseInt(dp[1])-1+check; var yrCheck=parseInt(dp[0]);
-    while(moCheck>11){moCheck-=12;yrCheck++;}
-    var mesCheck=yrCheck+'-'+pad(moCheck+1);
-    if(mesFechado(mesCheck)){
-      alert('⚠ O mês '+mesLabel(mesCheck)+' está FECHADO.\nNão é possível lançar neste período.');
+
+  // Calcula datas: 1ª parcela na data lançada, demais a cada 30 dias
+  var parcelas=[];
+  for(var i=0;i<n;i++){
+    var r=addDias(data, i*30);
+    parcelas.push(r);
+  }
+
+  // Verifica meses fechados antes de criar qualquer parcela
+  for(var c=0;c<parcelas.length;c++){
+    if(mesFechado(parcelas[c].mes)){
+      alert('⚠ O mês '+mesLabel(parcelas[c].mes)+' está FECHADO.\nNão é possível lançar neste período.');
       return;
     }
   }
+
   for(var i=0;i<n;i++){
-    var mo=parseInt(dp[1])-1+i;var yr=parseInt(dp[0]);
-    while(mo>11){mo-=12;yr++;}
-    var mes=yr+'-'+pad(mo+1);
-    var dLanc=i===0?data:yr+'-'+pad(mo+1)+'-'+dp[2];
     var l={
-      id:'l'+Date.now()+i,obraId:obraId,tipo:tipo,descricao:desc,resp:resp||'',
-      valor:parcVal,data:dLanc,mes:mes,
-      parcela:n>1?(i+1):0,total_parcelas:n>1?n:0
+      id:'l'+Date.now()+i,
+      obraId:obraId,
+      tipo:tipo,
+      descricao:desc,
+      resp:resp||'',
+      valor:parcVal,
+      data:parcelas[i].data,
+      mes:parcelas[i].mes,
+      parcela:n>1?(i+1):0,
+      total_parcelas:n>1?n:0
     };
     S.lancamentos.push(l);
     pushLanc(l);
