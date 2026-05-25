@@ -1388,57 +1388,60 @@ function filtrarHistorico(){
 
 // ===== RELATÓRIO =====
 function rRelatorio(){
-  var selO=document.getElementById('r-obra');
-  var selM=document.getElementById('r-mes');
-  var selC=document.getElementById('r-cat');
-  var inpB=document.getElementById('r-busca');
-  var filtros=document.getElementById('rel-filtros-secundarios');
-  var body=document.getElementById('rel-body');
   var cardsDiv=document.getElementById('rel-obra-cards');
-  if(!selO||!cardsDiv)return;
+  var selO=document.getElementById('r-obra');
+  if(!cardsDiv||!selO)return;
 
-  var curO=selO.value||'';
   var mes=mesAtual();
+  var curO=selO.value||'';
 
-  // Renderiza cards de obras (só se ainda não estiverem renderizados ou lista mudou)
-  var cardsRendered = cardsDiv.querySelectorAll('.rel-obra-card').length;
-  if(cardsRendered !== S.obras.length || !cardsRendered){
-    if(!S.obras.length){
-      cardsDiv.innerHTML='<div style="color:var(--text4);font-size:12px">Nenhuma obra cadastrada</div>';
-    } else {
-      cardsDiv.innerHTML=S.obras.map(function(o){
-        var tot=totalMesObra(o.id,mes);
-        var p=pctBudget(o.id,mes);
-        var cor=pctColor(p);
-        var sel=curO===o.id?'selected':'';
-        return'<div class="rel-obra-card '+sel+'" data-id="'+o.id+'">'+
-          '<div class="rel-obra-card-name">'+o.nome+'</div>'+
-          '<div class="rel-obra-card-info">'+mesLabel(mes)+': <span style="color:'+cor+'">'+fM(tot)+'</span></div>'+
-          '<div class="rel-obra-card-info" style="margin-top:3px">'+p.toFixed(0)+'% budget</div>'+
-        '</div>';
-      }).join('');
-    }
-    // Wire up click events
-    cardsDiv.querySelectorAll('.rel-obra-card').forEach(function(card){
-      card.addEventListener('click',function(){
-        // Atualiza visual de seleção
-        cardsDiv.querySelectorAll('.rel-obra-card').forEach(function(c){c.classList.remove('selected');});
-        this.classList.add('selected');
-        // Salva obra selecionada e gera relatório SEM recriar cards
-        selO.value=this.dataset.id;
-        gerarRelatorio();
-      });
-    });
+  // Sempre re-renderiza os cards com o estado atual
+  if(!S.obras.length){
+    cardsDiv.innerHTML='<div style="color:var(--text4);font-size:12px;padding:8px 0">Nenhuma obra cadastrada</div>';
   } else {
-    // Cards já existem — só atualiza classe selected
-    cardsDiv.querySelectorAll('.rel-obra-card').forEach(function(card){
-      card.classList.toggle('selected', card.dataset.id===curO);
-    });
+    cardsDiv.innerHTML=S.obras.map(function(o){
+      var tot=totalMesObra(o.id,mes);
+      var p=pctBudget(o.id,mes);
+      var cor=pctColor(p);
+      var sel=curO===o.id?' selected':'';
+      return'<div class="rel-obra-card'+sel+'" data-id="'+o.id+'">'+
+        '<div class="rel-obra-card-name">'+o.nome+'</div>'+
+        '<div class="rel-obra-card-info">'+mesLabel(mes)+': <span style="color:'+cor+'">'+fM(tot)+'</span></div>'+
+        '<div class="rel-obra-card-info" style="margin-top:3px">'+p.toFixed(0)+'% do budget</div>'+
+      '</div>';
+    }).join('');
   }
 
-  // Gera o relatório com a obra selecionada
+  // Geração do relatório com obra atual
   gerarRelatorio();
 }
+
+// Delegação de evento nos cards — registrada UMA VEZ no documento
+document.addEventListener('click', function(e){
+  var card = e.target.closest('.rel-obra-card');
+  if(!card) return;
+  // Só age se estiver na página de relatório
+  var page = document.getElementById('page-relatorio');
+  if(!page || !page.classList.contains('active')) return;
+
+  // Atualiza seleção visual
+  document.querySelectorAll('.rel-obra-card').forEach(function(c){c.classList.remove('selected');});
+  card.classList.add('selected');
+
+  // Salva obra e gera relatório
+  var selO = document.getElementById('r-obra');
+  if(selO) selO.value = card.dataset.id;
+
+  // Reseta filtros ao trocar de obra
+  var selM = document.getElementById('r-mes');
+  if(selM) selM.value = '';
+  var selC = document.getElementById('r-cat');
+  if(selC) selC.value = '';
+  var inpB = document.getElementById('r-busca');
+  if(inpB) inpB.value = '';
+
+  gerarRelatorio();
+});
 
 function gerarRelatorio(){
   var selO=document.getElementById('r-obra');
