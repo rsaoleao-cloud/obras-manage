@@ -495,44 +495,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
 
     <!-- RELATÓRIO -->
     <div class="page" id="page-relatorio">
-      <!-- OBRAS COMO CARDS -->
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;margin-bottom:14px;box-shadow:var(--shadow)">
-        <div style="font-size:10px;color:var(--accent);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:10px">① Selecione a obra</div>
-        <div class="rel-obra-cards" id="rel-obra-cards">
-          <div style="color:var(--text3);font-size:12px">Carregando obras...</div>
-        </div>
-        <input type="hidden" id="r-obra" value="">
-      </div>
-
-      <!-- FILTROS SECUNDÁRIOS -->
-      <div id="rel-filtros-secundarios" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;margin-bottom:14px;box-shadow:var(--shadow)">
-        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:10px">② Refinar por</div>
-        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
-          <div><label class="flbl" style="display:block">Mês</label><select class="fi" id="r-mes" style="width:150px"></select></div>
-          <div><label class="flbl" style="display:block">Tipo de despesa</label>
-            <select class="fi" id="r-cat" style="width:180px">
-              <option value="">Todas as categorias</option>
-              <option value="despesa">💼 Despesa</option>
-              <option value="almoco">🍽 Almoço</option>
-              <option value="hospedagem">🏨 Hospedagem</option>
-              <option value="combustivel">⛽ Combustível</option>
-              <option value="prestador">🧑‍🔧 Prestador</option>
-              <option value="peca">🔩 Peça / Material</option>
-            </select>
-          </div>
-          <div><label class="flbl" style="display:block">Buscar lançamento</label>
-            <input class="fi" id="r-busca" placeholder="Descrição..." style="width:185px">
-          </div>
-          <button class="btn btn-primary" id="btn-filtrar-rel">🔍 Filtrar</button>
-          <button class="btn" id="btn-limpar-rel">✕ Limpar</button>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;flex-wrap:wrap;gap:8px">
-          <div style="font-size:11px;color:var(--text3);font-family:var(--mono)" id="rel-contador"></div>
-          <button class="btn" id="btn-print">🖨 Imprimir / PDF</button>
-        </div>
-      </div>
-
-      <div id="rel-body"></div>
+      <div id="relatorio-content"></div>
     </div>
 
     <!-- CONFIG -->
@@ -1417,137 +1380,186 @@ function filtrarHistorico(){
 }
 
 // ===== RELATÓRIO =====
+// Estado do relatório
+var REL = { obraId:'', mes:'', cat:'', busca:'' };
+
 function rRelatorio(){
-  var cardsDiv=document.getElementById('rel-obra-cards');
-  var selO=document.getElementById('r-obra');
-  if(!cardsDiv||!selO)return;
-
-  var mes=mesAtual();
-  var curO=selO.value||'';
-
-  // Sempre re-renderiza os cards com o estado atual
-  if(!S.obras.length){
-    cardsDiv.innerHTML='<div style="color:var(--text4);font-size:12px;padding:8px 0">Nenhuma obra cadastrada</div>';
-  } else {
-    cardsDiv.innerHTML=S.obras.map(function(o){
-      var tot=totalMesObra(o.id,mes);
-      var p=pctBudget(o.id,mes);
-      var cor=pctColor(p);
-      var sel=curO===o.id?' selected':'';
-      return'<div class="rel-obra-card'+sel+'" data-id="'+o.id+'">'+
-        '<div class="rel-obra-card-name">'+o.nome+'</div>'+
-        '<div class="rel-obra-card-info">'+mesLabel(mes)+': <span style="color:'+cor+'">'+fM(tot)+'</span></div>'+
-        '<div class="rel-obra-card-info" style="margin-top:3px">'+p.toFixed(0)+'% do budget</div>'+
-      '</div>';
-    }).join('');
-  }
-
-  // Geração do relatório com obra atual
-  gerarRelatorio();
+  // Reseta seleção ao abrir a página
+  REL.obraId=''; REL.mes=''; REL.cat=''; REL.busca='';
+  renderRelatorioObras();
 }
 
-// Delegação de evento nos cards — registrada UMA VEZ no documento
-document.addEventListener('click', function(e){
-  var card = e.target.closest('.rel-obra-card');
-  if(!card) return;
-  // Só age se estiver na página de relatório
-  var page = document.getElementById('page-relatorio');
-  if(!page || !page.classList.contains('active')) return;
+function renderRelatorioObras(){
+  var c = document.getElementById('relatorio-content');
+  if(!c) return;
+  var mes = mesAtual();
 
-  // Atualiza seleção visual
-  document.querySelectorAll('.rel-obra-card').forEach(function(c){c.classList.remove('selected');});
-  card.classList.add('selected');
-
-  // Salva obra e gera relatório
-  var selO = document.getElementById('r-obra');
-  if(selO) selO.value = card.dataset.id;
-
-  // Reseta filtros ao trocar de obra
-  var selM = document.getElementById('r-mes');
-  if(selM) selM.value = '';
-  var selC = document.getElementById('r-cat');
-  if(selC) selC.value = '';
-  var inpB = document.getElementById('r-busca');
-  if(inpB) inpB.value = '';
-
-  gerarRelatorio();
-});
-
-function gerarRelatorio(){
-  var selO=document.getElementById('r-obra');
-  var selM=document.getElementById('r-mes');
-  var selC=document.getElementById('r-cat');
-  var inpB=document.getElementById('r-busca');
-  var filtros=document.getElementById('rel-filtros-secundarios');
-  var body=document.getElementById('rel-body');
-  if(!selO||!body)return;
-
-  var curO=selO.value||'';
-  var mes=mesAtual();
-
-  if(!curO){
-    if(filtros)filtros.style.display='none';
-    body.innerHTML='<div class="empty"><div class="empty-icon">🏗️</div><div class="empty-text">Selecione uma obra acima para gerar o relatório.</div></div>';
+  if(!S.obras.length){
+    c.innerHTML='<div class="empty"><div class="empty-icon">🏗️</div><div class="empty-text">Nenhuma obra cadastrada.</div></div>';
     return;
   }
 
-  if(filtros)filtros.style.display='block';
+  // Lista de obras como botões
+  var listaHtml = S.obras.map(function(o){
+    var tot = totalMesObra(o.id, mes);
+    var p   = pctBudget(o.id, mes);
+    var cor = pctColor(p);
+    var isFechado = mesFechado(mes) ? ' 🔒' : '';
+    return '<button class="rel-obra-btn" data-id="'+o.id+'" style="'+
+      'display:flex;justify-content:space-between;align-items:center;'+
+      'width:100%;padding:14px 18px;margin-bottom:8px;'+
+      'background:var(--card);border:1px solid var(--border);border-radius:var(--r);'+
+      'cursor:pointer;transition:all .2s;text-align:left;color:var(--text);font-family:var(--font);">'+
+      '<div>'+
+        '<div style="font-size:15px;font-weight:600;font-family:var(--serif)">'+o.nome+isFechado+'</div>'+
+        '<div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:3px">'+
+          'Gasto em '+mesLabel(mes)+': <span style="color:'+cor+'">'+fM(tot)+'</span>'+
+          ' &nbsp;·&nbsp; '+p.toFixed(0)+'% do budget'+
+          (o.prazo?' &nbsp;·&nbsp; Prazo: '+fD(o.prazo):'')+'</div>'+
+      '</div>'+
+      '<div style="font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:600">Ver relatório →</div>'+
+    '</button>';
+  }).join('');
 
-  var curM=selM?selM.value:'';
-  var curC=selC?selC.value||'':'';
-  var curB=inpB?inpB.value.trim().toLowerCase():'';
+  c.innerHTML =
+    '<div style="font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:14px">Selecione uma obra</div>'+
+    listaHtml;
 
-  // Popula meses desta obra
-  var mesesObra={};
-  S.lancamentos.filter(function(l){return l.obraId===curO;}).forEach(function(l){if(l.mes)mesesObra[l.mes]=true;});
-  mesesObra[mes]=true;
-  var mArr=Object.keys(mesesObra).sort().reverse();
-  if(selM){
-    if(!curM||!mesesObra[curM])curM=mes;
-    selM.innerHTML=mArr.map(function(m){return'<option value="'+m+'"'+(m===curM?' selected':'')+'>'+mesLabel(m)+'</option>';}).join('');
-    selM.value=curM; curM=selM.value;
-  }
+  // Eventos dos botões de obra
+  c.querySelectorAll('.rel-obra-btn').forEach(function(btn){
+    btn.addEventListener('mouseenter', function(){ this.style.borderColor='var(--accent)'; this.style.background='var(--bg4)'; });
+    btn.addEventListener('mouseleave', function(){ this.style.borderColor='var(--border)'; this.style.background='var(--card)'; });
+    btn.addEventListener('click', function(){
+      REL.obraId = this.dataset.id;
+      REL.mes    = mesAtual();
+      REL.cat    = '';
+      REL.busca  = '';
+      renderRelatorioFiltros();
+    });
+  });
+}
 
-  var o=findO(curO);
-  if(!o){body.innerHTML='';return;}
+function renderRelatorioFiltros(){
+  var c = document.getElementById('relatorio-content');
+  var o = findO(REL.obraId);
+  if(!c || !o) return;
 
-  var h='';
-  var dn=new Date();
-  if(dn.getDate()>=20)h+='<div class="alert al-ok" style="margin-bottom:14px"><span>📋</span><span>Dia 20+ — Relatório de '+mesLabel(curM)+' disponível para impressão!</span></div>';
+  // Meses com lançamentos desta obra
+  var meses = {};
+  S.lancamentos.filter(function(l){return l.obraId===REL.obraId;}).forEach(function(l){if(l.mes)meses[l.mes]=true;});
+  meses[mesAtual()] = true;
+  var mArr = Object.keys(meses).sort().reverse();
+  if(!REL.mes || !meses[REL.mes]) REL.mes = mArr[0]||mesAtual();
 
-  var lancs=gastosMes(curO,curM).filter(function(l){
-    if(curC&&l.tipo!==curC)return false;
-    if(curB&&l.descricao.toLowerCase().indexOf(curB)===-1)return false;
+  var optsM = mArr.map(function(m){
+    return'<option value="'+m+'"'+(m===REL.mes?' selected':'')+'>'+mesLabel(m)+(mesFechado(m)?' 🔒':'')+' </option>';
+  }).join('');
+
+  c.innerHTML =
+    // Cabeçalho com botão voltar
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">'+
+      '<button id="rel-voltar" class="btn" style="flex-shrink:0">← Obras</button>'+
+      '<div>'+
+        '<div style="font-family:var(--serif);font-size:18px;font-weight:700">'+o.nome+'</div>'+
+        '<div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:2px">'+statusBadge(o.status)+(o.prazo?' &nbsp;Prazo: '+fD(o.prazo):'')+' &nbsp;Budget: '+fM(o.budget||0)+'</div>'+
+      '</div>'+
+      '<button class="btn" id="rel-imprimir" style="margin-left:auto">🖨 PDF</button>'+
+    '</div>'+
+    // Filtros
+    '<div class="fcard" style="margin-bottom:16px">'+
+      '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">'+
+        '<div><label class="flbl" style="display:block">Mês</label>'+
+          '<select class="fi" id="rel-sel-mes" style="width:160px">'+optsM+'</select></div>'+
+        '<div><label class="flbl" style="display:block">Tipo de despesa</label>'+
+          '<select class="fi" id="rel-sel-cat" style="width:180px">'+
+            '<option value="">Todas as categorias</option>'+
+            '<option value="despesa">💼 Despesa</option>'+
+            '<option value="almoco">🍽 Almoço</option>'+
+            '<option value="hospedagem">🏨 Hospedagem</option>'+
+            '<option value="combustivel">⛽ Combustível</option>'+
+            '<option value="prestador">🧑‍🔧 Prestador</option>'+
+            '<option value="peca">🔩 Peça / Material</option>'+
+          '</select></div>'+
+        '<div><label class="flbl" style="display:block">Buscar</label>'+
+          '<input class="fi" id="rel-busca" placeholder="Descrição..." style="width:180px" value="'+REL.busca+'"></div>'+
+        '<button class="btn btn-primary" id="rel-filtrar">🔍 Filtrar</button>'+
+        '<button class="btn" id="rel-limpar">✕ Limpar</button>'+
+      '</div>'+
+    '</div>'+
+    '<div id="rel-resultado"></div>';
+
+  // Eventos filtros
+  document.getElementById('rel-voltar').addEventListener('click', function(){ renderRelatorioObras(); });
+  document.getElementById('rel-imprimir').addEventListener('click', function(){ window.print(); });
+  document.getElementById('rel-filtrar').addEventListener('click', function(){
+    REL.mes   = document.getElementById('rel-sel-mes').value;
+    REL.cat   = document.getElementById('rel-sel-cat').value;
+    REL.busca = document.getElementById('rel-busca').value.trim().toLowerCase();
+    renderRelatorioResultado();
+  });
+  document.getElementById('rel-limpar').addEventListener('click', function(){
+    REL.cat=''; REL.busca='';
+    document.getElementById('rel-sel-cat').value='';
+    document.getElementById('rel-busca').value='';
+    renderRelatorioResultado();
+  });
+  document.getElementById('rel-sel-mes').addEventListener('change', function(){
+    REL.mes = this.value;
+    renderRelatorioResultado();
+  });
+
+  renderRelatorioResultado();
+}
+
+function renderRelatorioResultado(){
+  var el = document.getElementById('rel-resultado');
+  if(!el) return;
+  var o = findO(REL.obraId);
+  if(!o){el.innerHTML='';return;}
+
+  var lancs = gastosMes(REL.obraId, REL.mes).filter(function(l){
+    if(REL.cat  && l.tipo!==REL.cat) return false;
+    if(REL.busca && l.descricao.toLowerCase().indexOf(REL.busca)===-1) return false;
     return true;
   });
 
-  var tot=lancs.reduce(function(a,l){return a+Number(l.valor);},0);
-  var pp=o.budget?((tot/Number(o.budget))*100).toFixed(0):'-';
-  var cor=Number(pp)>=100?'#ef4444':Number(pp)>=90?'#ea580c':Number(pp)>=70?'#f59e0b':'#1e90ff';
+  var tot = lancs.reduce(function(a,l){return a+Number(l.valor);},0);
+  var pp  = o.budget ? ((tot/Number(o.budget))*100).toFixed(0) : '-';
+  var cor = Number(pp)>=100?'#ef4444':Number(pp)>=90?'#ea580c':Number(pp)>=70?'#f59e0b':'#1e90ff';
 
-  h+='<div class="rel-os"><div class="rel-ot">'+
-    '<div><div style="font-family:var(--serif);font-size:17px;font-weight:600">'+o.nome+'</div>'+
-    '<div style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:3px">'+mesLabel(curM)+
-    (o.prazo?' · Prazo: '+fD(o.prazo):'')+
-    (o.budget?' · Budget: '+fM(o.budget):'')+
-    '</div></div>'+
-    '<div style="display:flex;gap:10px;align-items:center">'+statusBadge(o.status)+
-    (o.budget?'<span style="font-family:var(--mono);font-size:12px;color:'+cor+';font-weight:600">'+pp+'% do budget</span>':'')+
-    '</div></div><div class="rel-bi">';
-
-  var makeRows=function(arr){
+  var makeRows = function(arr){
     return arr.slice().sort(function(a,b){return b.data.localeCompare(a.data);}).map(function(l){
       var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':'';
       var desc=l.descricao;
-      if(curB)desc=desc.replace(new RegExp('('+curB+')','gi'),'<mark style="background:#fef08a;color:#111;border-radius:2px">$1</mark>');
-      return'<tr><td style="white-space:nowrap">'+fD(l.data)+'</td><td>'+desc+'</td><td>'+(l.resp||'—')+'</td><td>'+catBadge(l.tipo)+'</td><td>'+pb+'</td><td style="font-family:var(--mono);text-align:right;white-space:nowrap">'+fM(l.valor)+'</td></tr>';
+      if(REL.busca) desc=desc.replace(new RegExp('('+REL.busca+')','gi'),'<mark style="background:#fef08a;color:#111;border-radius:2px">$1</mark>');
+      return'<tr><td style="white-space:nowrap">'+fD(l.data)+'</td><td>'+desc+'</td><td>'+(l.resp||'—')+'</td><td>'+catBadge(l.tipo)+'</td><td>'+pb+'</td><td style="font-family:var(--mono);text-align:right">'+fM(l.valor)+'</td></tr>';
     }).join('');
   };
 
-  if(curC){
-    var c=CATEGORIAS[curC]||CATEGORIAS.despesa;
-    if(!lancs.length){h+='<div style="padding:18px;text-align:center;color:var(--text4);font-size:12px">Nenhum lançamento de '+c.label+' em '+mesLabel(curM)+'</div>';}
-    else{h+='<div style="padding:7px 14px;background:'+c.bg+';border-bottom:1px solid var(--border);font-size:10px;font-family:var(--mono);text-transform:uppercase;display:flex;justify-content:space-between"><span style="color:'+c.cor+'">'+c.icon+' '+c.label+'</span><span style="color:'+c.cor+'">'+fM(tot)+'</span></div><table><thead><tr><th>Data</th><th>Descrição</th><th>Resp.</th><th>Tipo</th><th>Pgto</th><th style="text-align:right">Valor</th></tr></thead><tbody>'+makeRows(lancs)+'</tbody></table>';}
+  var h='';
+  var dn=new Date();
+  if(dn.getDate()>=20&&!REL.cat&&!REL.busca)
+    h+='<div class="alert al-ok" style="margin-bottom:14px"><span>📋</span><span>Dia 20+ — Relatório de '+mesLabel(REL.mes)+' disponível para impressão!</span></div>';
+
+  if(mesFechado(REL.mes)){
+    var f2=getFechamento(REL.mes);
+    h+='<div class="alert al-ok" style="margin-bottom:14px"><span>🔒</span><span>Mês <strong>'+mesLabel(REL.mes)+'</strong> fechado em '+fD(f2.fechadoEm.substring(0,10))+' por '+f2.fechadoPor+'</span></div>';
+  }
+
+  h+='<div class="rel-os"><div class="rel-ot">'+
+    '<span>'+o.nome+' · '+mesLabel(REL.mes)+'</span>'+
+    '<span style="font-family:var(--mono);font-size:12px;color:'+cor+'">'+pp+'% do budget ('+fM(o.budget||0)+')</span>'+
+  '</div><div class="rel-bi">';
+
+  if(REL.cat){
+    var c2=CATEGORIAS[REL.cat]||CATEGORIAS.despesa;
+    if(!lancs.length){
+      h+='<div style="padding:18px;text-align:center;color:var(--text4);font-size:12px">Sem lançamentos de '+c2.label+' em '+mesLabel(REL.mes)+'</div>';
+    } else {
+      h+='<div style="padding:7px 14px;background:'+c2.bg+';border-bottom:1px solid var(--border);font-size:10px;font-family:var(--mono);text-transform:uppercase;display:flex;justify-content:space-between">'+
+        '<span style="color:'+c2.cor+'">'+c2.icon+' '+c2.label+'</span><span style="color:'+c2.cor+'">'+fM(tot)+'</span></div>'+
+        '<table><thead><tr><th>Data</th><th>Descrição</th><th>Resp.</th><th>Tipo</th><th>Pgto</th><th style="text-align:right">Valor</th></tr></thead><tbody>'+makeRows(lancs)+'</tbody></table>';
+    }
   } else {
     var cats=['despesa','almoco','hospedagem','combustivel','prestador','peca'];
     var algum=false;
@@ -1555,28 +1567,22 @@ function gerarRelatorio(){
       var arr=lancs.filter(function(l){return l.tipo===cat;});
       if(!arr.length)return; algum=true;
       var tCat=arr.reduce(function(a,l){return a+Number(l.valor);},0);
-      var c=CATEGORIAS[cat]||CATEGORIAS.despesa;
+      var c3=CATEGORIAS[cat]||CATEGORIAS.despesa;
       var bCat=cat==='almoco'?o.b_almoco:cat==='hospedagem'?o.b_hospedagem:cat==='combustivel'?o.b_combustivel:cat==='prestador'?o.b_prestador:'';
       var cPct=bCat&&Number(bCat)>0?((tCat/Number(bCat))*100):null;
-      var cCor=cPct===null?c.cor:cPct>=100?'#ef4444':cPct>=90?'#ea580c':cPct>=70?'#f59e0b':'#10b981';
-      var lTxt=cPct!==null?' · '+cPct.toFixed(0)+'% do limite ('+fM(bCat)+')':'';
-      h+='<div style="padding:7px 14px;background:'+c.bg+';border-bottom:1px solid var(--border);font-size:10px;font-family:var(--mono);text-transform:uppercase;display:flex;justify-content:space-between"><span style="color:'+c.cor+'">'+c.icon+' '+c.label+'</span><span style="color:'+cCor+'">'+fM(tCat)+lTxt+'</span></div>'+
-      '<table><thead><tr><th>Data</th><th>Descrição</th><th>Resp.</th><th>Tipo</th><th>Pgto</th><th style="text-align:right">Valor</th></tr></thead><tbody>'+makeRows(arr)+'</tbody></table>'+
-      '<div class="rel-sub"><span style="color:'+c.cor+'">Subtotal '+c.label+'</span><span style="font-family:var(--mono);color:'+c.cor+'">'+fM(tCat)+'</span></div>';
+      var cCor=cPct===null?c3.cor:cPct>=100?'#ef4444':cPct>=90?'#ea580c':cPct>=70?'#f59e0b':'#10b981';
+      var lTxt=cPct!==null?' · '+cPct.toFixed(0)+'% de '+fM(bCat):'';
+      h+='<div style="padding:7px 14px;background:'+c3.bg+';border-bottom:1px solid var(--border);font-size:10px;font-family:var(--mono);text-transform:uppercase;display:flex;justify-content:space-between">'+
+        '<span style="color:'+c3.cor+'">'+c3.icon+' '+c3.label+'</span><span style="color:'+cCor+'">'+fM(tCat)+lTxt+'</span></div>'+
+        '<table><thead><tr><th>Data</th><th>Descrição</th><th>Resp.</th><th>Tipo</th><th>Pgto</th><th style="text-align:right">Valor</th></tr></thead><tbody>'+makeRows(arr)+'</tbody></table>'+
+        '<div class="rel-sub"><span style="color:'+c3.cor+'">Subtotal '+c3.label+'</span><span style="font-family:var(--mono);color:'+c3.cor+'">'+fM(tCat)+'</span></div>';
     });
-    if(!algum)h+='<div style="padding:18px;text-align:center;color:var(--text4);font-size:12px">Sem lançamentos em '+mesLabel(curM)+'</div>';
+    if(!algum)h+='<div style="padding:18px;text-align:center;color:var(--text4);font-size:12px">Sem lançamentos em '+mesLabel(REL.mes)+'</div>';
   }
 
-  h+='<div class="rel-sub" style="background:var(--bg4);font-size:13px"><strong>TOTAL — '+o.nome+' · '+mesLabel(curM)+'</strong><strong style="font-family:var(--mono);color:var(--accent)">'+fM(tot)+'</strong></div></div></div>';
-  body.innerHTML=h;
-
-  var cont=document.getElementById('rel-contador');
-  if(cont){
-    var fTxt=[];
-    if(curC)fTxt.push(catLabel(curC));
-    if(curB)fTxt.push('"'+curB+'"');
-    cont.textContent=lancs.length+' lançamento'+(lancs.length!==1?'s':'')+(fTxt.length?' · '+fTxt.join(' · '):'');
-  }
+  h+='<div class="rel-sub" style="background:var(--bg4);font-size:13px"><strong>TOTAL · '+mesLabel(REL.mes)+'</strong><strong style="font-family:var(--mono);color:var(--accent)">'+fM(tot)+'</strong></div></div></div>';
+  h+='<div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:8px">'+lancs.length+' lançamento'+(lancs.length!==1?'s':'')+(REL.cat?' · '+catLabel(REL.cat):'')+'</div>';
+  el.innerHTML=h;
 }
 
 
@@ -2192,17 +2198,7 @@ document.getElementById('nav-fechamentos').addEventListener('click',function(){s
 document.getElementById('nav-relatorio').addEventListener('click',function(){showPage('relatorio');});
 document.getElementById('nav-config').addEventListener('click',function(){showPage('config');});
 document.getElementById('btn-salvar-lanc').addEventListener('click',saveLanc);
-document.getElementById('btn-filtrar-rel').addEventListener('click',gerarRelatorio);
-document.getElementById('btn-limpar-rel').addEventListener('click',function(){
-  document.getElementById('r-cat').value='';
-  document.getElementById('r-busca').value='';
-  gerarRelatorio();
-});
-document.addEventListener('keydown',function(e){
-  if(e.key==='Enter'&&document.getElementById('r-busca')===document.activeElement)gerarRelatorio();
-});
 document.getElementById('btn-filtrar-hist').addEventListener('click',filtrarHistorico);
-document.getElementById('btn-print').addEventListener('click',function(){window.print();});
 document.getElementById('cfg-exp').addEventListener('click',exportar);
 document.getElementById('cfg-del').addEventListener('click',function(){
   if(!confirm('Apagar TODOS os dados?'))return;
