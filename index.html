@@ -202,6 +202,19 @@ select.fi option{background:var(--bg2);color:var(--text)}
 .divider{height:1px;background:var(--border);margin:16px 0}
 .section-hdr{font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;font-weight:600}
 
+/* LONG PRESS / SELEÇÃO DE LANÇAMENTOS */
+.lanc-row{cursor:pointer;transition:background .15s;-webkit-user-select:none;user-select:none}
+.lanc-row:active{background:rgba(30,110,217,.06)}
+.lanc-row.selecionado td{background:rgba(220,38,38,.07)!important}
+.lanc-row.selecionado{outline:2px solid rgba(220,38,38,.3)}
+.lanc-sel-bar{display:none;position:fixed;bottom:0;left:0;right:0;background:#dc2626;color:#fff;padding:13px 18px;box-shadow:0 -4px 16px rgba(220,38,38,.25);z-index:200;align-items:center;justify-content:space-between;gap:10px}
+.lanc-sel-bar.visible{display:flex}
+.lanc-sel-bar-info{font-size:13px;font-weight:600}
+.lanc-sel-bar-btns{display:flex;gap:8px}
+.lanc-sel-bar button{padding:9px 18px;border-radius:var(--rsm);border:none;cursor:pointer;font-family:var(--font);font-size:13px;font-weight:600}
+.lanc-sel-excluir{background:#fff;color:#dc2626}
+.lanc-sel-cancelar{background:rgba(255,255,255,.2);color:#fff}
+
 /* LOGIN */
 .login-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column}
 .login-box{background:var(--card);border:1px solid var(--border2);border-radius:16px;padding:42px 38px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
@@ -547,6 +560,15 @@ select.fi option{background:var(--bg2);color:var(--text)}
 </div>
 
 <div id="modal" class="mo hidden"><div class="mbox" id="mbox"></div></div>
+
+<!-- BARRA DE SELEÇÃO DE LANÇAMENTOS -->
+<div id="lanc-sel-bar" class="lanc-sel-bar">
+  <div class="lanc-sel-bar-info" id="lanc-sel-info">0 selecionado(s)</div>
+  <div class="lanc-sel-bar-btns">
+    <button class="lanc-sel-excluir" id="lanc-sel-excluir-btn">🗑 Excluir</button>
+    <button class="lanc-sel-cancelar" id="lanc-sel-cancelar-btn">✕ Cancelar</button>
+  </div>
+</div>
 
 <!-- NAV INFERIOR MOBILE -->
 <nav class="mobile-nav">
@@ -1429,18 +1451,124 @@ function rLancamentos(){
     '</div>';
   }
 
-  var rec=S.lancamentos.slice().sort(function(a,b){return b.data.localeCompare(a.data);}).slice(0,15);
+  var rec=S.lancamentos.slice().sort(function(a,b){return b.data.localeCompare(a.data);}).slice(0,50);
   var rows='';
   rec.forEach(function(l){
     var o=findO(l.obraId);
     var tb=catBadge(l.tipo);
     var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':'<span style="font-size:10px;color:var(--text4)">À vista</span>';
-    rows+='<tr><td>'+fD(l.data)+'</td><td>'+(o?o.nome:'—')+'</td><td>'+l.descricao+'</td><td>'+(l.resp||'—')+'</td><td>'+tb+'</td><td>'+pb+'</td><td style="font-family:var(--mono);text-align:right">'+fM(l.valor)+'</td><td><button class="btn btn-danger" style="font-size:10px;padding:3px 8px" data-id="'+l.id+'">✕</button></td></tr>';
+    rows+='<tr class="lanc-row" data-id="'+l.id+'">'+
+      '<td>'+fD(l.data)+'</td>'+
+      '<td>'+(o?o.nome:'—')+'</td>'+
+      '<td>'+l.descricao+'</td>'+
+      '<td>'+(l.resp||'—')+'</td>'+
+      '<td>'+tb+'</td>'+
+      '<td>'+pb+'</td>'+
+      '<td style="font-family:var(--mono);text-align:right">'+fM(l.valor)+'</td>'+
+      '<td><button class="btn btn-danger" style="font-size:10px;padding:3px 8px" data-id="'+l.id+'">✕</button></td>'+
+    '</tr>';
   });
+
   document.getElementById('lanc-rec').innerHTML=
     resumo+
-    (rec.length?'<div class="tw"><div class="tw-hdr">Últimos lançamentos</div><table><thead><tr><th>Data</th><th>Obra</th><th>Descrição</th><th>Resp.</th><th>Tipo de Despesa</th><th>Pgto</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>':'');
-  document.querySelectorAll('#lanc-rec .btn-danger[data-id]').forEach(function(b){b.addEventListener('click',function(){delLanc(this.dataset.id,null);rLancamentos();});});
+    (rec.length?'<div class="tw"><div class="tw-hdr" style="display:flex;justify-content:space-between;align-items:center"><span>Últimos lançamentos</span><span style="font-size:10px;color:var(--text3);font-family:var(--mono)">Segure para selecionar · Toque ✕ para excluir</span></div><table><thead><tr><th>Data</th><th>Obra</th><th>Descrição</th><th>Resp.</th><th>Tipo</th><th>Pgto</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>':'');
+
+  // Botão ✕ (desktop/direto)
+  document.querySelectorAll('#lanc-rec .btn-danger[data-id]').forEach(function(b){
+    b.addEventListener('click',function(e){
+      e.stopPropagation();
+      delLanc(this.dataset.id,null);
+      rLancamentos();
+    });
+  });
+
+  // Long press / seleção múltipla (mobile)
+  bindLancSelection();
+}
+
+// ============================================================
+// SELEÇÃO DE LANÇAMENTOS — Long press (mobile) + click (desktop)
+// ============================================================
+var _lancSelecionados = {};
+var _longPressTimer = null;
+var _selModo = false;
+
+function bindLancSelection(){
+  _lancSelecionados = {};
+  _selModo = false;
+  atualizarBarraSel();
+
+  document.querySelectorAll('#lanc-rec .lanc-row').forEach(function(row){
+    var id = row.dataset.id;
+
+    // LONG PRESS — inicia modo seleção
+    row.addEventListener('touchstart', function(e){
+      _longPressTimer = setTimeout(function(){
+        _selModo = true;
+        toggleSel(id, row);
+        // Vibração haptica se disponível
+        if(navigator.vibrate) navigator.vibrate(40);
+      }, 500);
+    }, {passive:true});
+
+    row.addEventListener('touchend', function(){
+      clearTimeout(_longPressTimer);
+    });
+    row.addEventListener('touchmove', function(){
+      clearTimeout(_longPressTimer);
+    });
+
+    // CLICK — se em modo seleção, toggle; senão ignora (botão ✕ cuida)
+    row.addEventListener('click', function(){
+      if(_selModo) toggleSel(id, row);
+    });
+  });
+
+  // Botão excluir da barra
+  document.getElementById('lanc-sel-excluir-btn').onclick = function(){
+    var ids = Object.keys(_lancSelecionados).filter(function(k){return _lancSelecionados[k];});
+    if(!ids.length) return;
+    var nome = prompt('Seu nome (obrigatório):');
+    if(!nome || !nome.trim()) return;
+    var motivo = prompt('Motivo da exclusão (obrigatório):');
+    if(!motivo || !motivo.trim()) return;
+    ids.forEach(function(id){ delLanc(id, null, nome.trim(), motivo.trim()); });
+    cancelarSel();
+    rLancamentos();
+  };
+
+  // Botão cancelar da barra
+  document.getElementById('lanc-sel-cancelar-btn').onclick = cancelarSel;
+}
+
+function toggleSel(id, row){
+  _lancSelecionados[id] = !_lancSelecionados[id];
+  row.classList.toggle('selecionado', !!_lancSelecionados[id]);
+  var n = Object.values(_lancSelecionados).filter(Boolean).length;
+  if(n === 0){ cancelarSel(); return; }
+  atualizarBarraSel();
+}
+
+function cancelarSel(){
+  _selModo = false;
+  _lancSelecionados = {};
+  document.querySelectorAll('#lanc-rec .lanc-row.selecionado').forEach(function(r){
+    r.classList.remove('selecionado');
+  });
+  atualizarBarraSel();
+}
+
+function atualizarBarraSel(){
+  var bar = document.getElementById('lanc-sel-bar');
+  var info = document.getElementById('lanc-sel-info');
+  if(!bar) return;
+  var n = Object.values(_lancSelecionados).filter(Boolean).length;
+  if(n > 0){
+    bar.classList.add('visible');
+    info.textContent = n + ' lançamento' + (n!==1?'s':'') + ' selecionado' + (n!==1?'s':'');
+  } else {
+    bar.classList.remove('visible');
+  }
 }
 
 function atualizarPreview(){
