@@ -434,6 +434,8 @@ select.fi option{background:var(--bg2);color:var(--text)}
       <div class="month-timeline" id="dash-timeline"></div>
       <div class="section-hdr" id="dash-obras-lbl"></div>
       <div id="dash-obras"></div>
+      <div class="section-hdr" id="dash-lancs-lbl" style="margin-top:22px"></div>
+      <div id="dash-lancs"></div>
     </div>
 
     <!-- OBRA DASHBOARD -->
@@ -1161,6 +1163,74 @@ function rDashboard(){
   document.querySelectorAll('#dash-obras .oc').forEach(function(c){
     c.addEventListener('click',function(){showPage('obra-dashboard',this.dataset.id);});
   });
+
+  // ---- LANÇAMENTOS RECENTES ----
+  var recLancs=S.lancamentos.slice().sort(function(a,b){return b.data.localeCompare(a.data);}).slice(0,20);
+  var dashLancsEl=document.getElementById('dash-lancs');
+  var dashLancsLbl=document.getElementById('dash-lancs-lbl');
+  if(!recLancs.length){
+    dashLancsLbl.textContent='';
+    dashLancsEl.innerHTML='';
+    return;
+  }
+  dashLancsLbl.textContent='Lançamentos recentes — duplo clique para excluir';
+  var lRows=recLancs.map(function(l){
+    var o2=findO(l.obraId);
+    var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':'';
+    return'<tr class="dash-lanc-row" data-id="'+l.id+'" title="Duplo clique para excluir" style="-webkit-user-select:none;user-select:none;cursor:pointer">'+
+      '<td>'+fD(l.data)+'</td>'+
+      '<td>'+(o2?o2.nome:'—')+'</td>'+
+      '<td>'+l.descricao+'</td>'+
+      '<td>'+(l.resp||'—')+'</td>'+
+      '<td>'+catBadge(l.tipo)+'</td>'+
+      '<td>'+pb+'</td>'+
+      '<td style="font-family:var(--mono);text-align:right;font-weight:600">'+fM(l.valor)+'</td>'+
+    '</tr>';
+  }).join('');
+  dashLancsEl.innerHTML=
+    '<div class="tw"><table>'+
+      '<thead><tr><th>Data</th><th>Obra</th><th>Descrição</th><th>Resp.</th><th>Tipo</th><th>Pgto</th><th style="text-align:right">Valor</th></tr></thead>'+
+      '<tbody>'+lRows+'</tbody>'+
+    '</table></div>'+
+    '<div style="font-size:10px;color:var(--text4);font-family:var(--mono);margin-top:6px;text-align:center">'+
+      '📱 Mobile: pressione e segure &nbsp;·&nbsp; 🖥️ Desktop: duplo clique'+
+    '</div>';
+
+  // Duplo clique — desktop
+  document.querySelectorAll('#dash-lancs .dash-lanc-row').forEach(function(row){
+    var clickTimer=null;
+    // DUPLO CLIQUE desktop
+    row.addEventListener('dblclick',function(){
+      excluirLancDash(this.dataset.id);
+    });
+    // LONG PRESS — mobile
+    row.addEventListener('touchstart',function(e){
+      var id=this.dataset.id;
+      clickTimer=setTimeout(function(){
+        if(navigator.vibrate)navigator.vibrate(40);
+        excluirLancDash(id);
+      },600);
+    },{passive:true});
+    row.addEventListener('touchend',function(){clearTimeout(clickTimer);});
+    row.addEventListener('touchmove',function(){clearTimeout(clickTimer);});
+    // Highlight ao passar mouse
+    row.addEventListener('mouseenter',function(){this.style.background='rgba(220,38,38,.04)';});
+    row.addEventListener('mouseleave',function(){this.style.background='';});
+  });
+}
+
+function excluirLancDash(id){
+  // Usa o modal de exclusão existente, recarrega dashboard ao fechar
+  var _origClose=closeModal;
+  delLanc(id,null);
+  // Observa fechamento do modal para atualizar dashboard
+  var check=setInterval(function(){
+    var mo=document.getElementById('modal');
+    if(mo&&mo.classList.contains('hidden')){
+      clearInterval(check);
+      rDashboard();
+    }
+  },200);
 }
 
 // ===== OBRA DASHBOARD =====
