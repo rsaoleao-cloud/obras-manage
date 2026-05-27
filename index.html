@@ -1510,19 +1510,31 @@ function rDetalhe(obraId){
 // ===== LANÇAMENTOS =====
 function rLancamentos(){
   var selEl=document.getElementById('l-obra');
-  var obraAnterior=selEl?selEl.value:''; // guarda obra selecionada antes de repopular
+  var obraAnterior=selEl?selEl.value:'';
   var opts=S.obras.map(function(o){return'<option value="'+o.id+'"'+(o.id===obraAnterior?' selected':'')+'>'+o.nome+'</option>';}).join('');
   selEl.innerHTML=opts||'<option value="">Nenhuma obra</option>';
-  // Restaura seleção anterior se ainda existe
   if(obraAnterior) selEl.value=obraAnterior;
   document.getElementById('l-data').value=hoje();
   atualizarPreview();
   bindAllMoney();
+  // Atualiza lista ao trocar obra
+  selEl.onchange=function(){ atualizarListaLancs(); };
+  atualizarListaLancs();
+}
 
+function atualizarListaLancs(){
+  var selEl=document.getElementById('l-obra');
+  var obraId=selEl?selEl.value:'';
   var mes=mesAtual();
-  var lancsDoMes=S.lancamentos.filter(function(l){return l.mes===mes;});
 
-  // Resumo por tipo de despesa no mês atual
+  // Filtra pela obra selecionada (ou todos se nenhuma)
+  var base=obraId
+    ? S.lancamentos.filter(function(l){return l.obraId===obraId;})
+    : S.lancamentos;
+
+  var lancsDoMes=base.filter(function(l){return l.mes===mes;});
+
+  // Resumo por categoria do mês
   var resumo='';
   if(lancsDoMes.length){
     var porCat={};
@@ -1531,6 +1543,7 @@ function rLancamentos(){
       porCat[l.tipo]+=Number(l.valor);
     });
     var totalMes=lancsDoMes.reduce(function(a,l){return a+Number(l.valor);},0);
+    var o=obraId?findO(obraId):null;
     var catCols=Object.keys(porCat).map(function(cat){
       var c=CATEGORIAS[cat]||CATEGORIAS.despesa;
       var pct=((porCat[cat]/totalMes)*100).toFixed(0);
@@ -1541,21 +1554,24 @@ function rLancamentos(){
       '</div>';
     }).join('');
     resumo='<div style="margin-bottom:18px">'+
-      '<div class="section-hdr" style="margin-bottom:10px">Gastos por tipo de despesa — '+mesLabel(mes)+'</div>'+
+      '<div class="section-hdr" style="margin-bottom:10px">'+
+        'Gastos em '+mesLabel(mes)+(o?' — '+o.nome:'')+
+      '</div>'+
       '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px">'+catCols+'</div>'+
-      '<div style="font-size:11px;font-family:var(--mono);color:var(--text3)">Total do mês: <strong style="color:var(--text)">'+fM(totalMes)+'</strong> · '+lancsDoMes.length+' lançamentos</div>'+
+      '<div style="font-size:11px;font-family:var(--mono);color:var(--text3)">Total: <strong style="color:var(--text)">'+fM(totalMes)+'</strong> · '+lancsDoMes.length+' lançamento'+(lancsDoMes.length!==1?'s':'')+'</div>'+
     '</div>';
   }
 
-  var rec=S.lancamentos.slice().sort(function(a,b){return b.data.localeCompare(a.data);}).slice(0,50);
+  // Lista dos 50 mais recentes da obra selecionada
+  var rec=base.slice().sort(function(a,b){return b.data.localeCompare(a.data);}).slice(0,50);
   var rows='';
   rec.forEach(function(l){
-    var o=findO(l.obraId);
+    var ob=findO(l.obraId);
     var tb=catBadge(l.tipo);
     var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':'<span style="font-size:10px;color:var(--text4)">À vista</span>';
     rows+='<tr class="lanc-row" data-id="'+l.id+'">'+
       '<td>'+fD(l.data)+'</td>'+
-      '<td>'+(o?o.nome:'—')+'</td>'+
+      (obraId?'':'<td>'+(ob?ob.nome:'—')+'</td>')+
       '<td>'+l.descricao+'</td>'+
       '<td>'+(l.resp||'—')+'</td>'+
       '<td>'+tb+'</td>'+
@@ -1565,20 +1581,33 @@ function rLancamentos(){
     '</tr>';
   });
 
+  var tituloLista = obraId
+    ? 'Lançamentos — '+(findO(obraId)?findO(obraId).nome:'obra')
+    : 'Últimos lançamentos';
+
+  var headerCols = obraId
+    ? '<th>Data</th><th>Descrição</th><th>Resp.</th><th>Tipo</th><th>Pgto</th><th style="text-align:right">Valor</th><th></th>'
+    : '<th>Data</th><th>Obra</th><th>Descrição</th><th>Resp.</th><th>Tipo</th><th>Pgto</th><th style="text-align:right">Valor</th><th></th>';
+
   document.getElementById('lanc-rec').innerHTML=
     resumo+
-    (rec.length?'<div class="tw"><div class="tw-hdr" style="display:flex;justify-content:space-between;align-items:center"><span>Últimos lançamentos</span><span style="font-size:10px;color:var(--text3);font-family:var(--mono)">Segure para selecionar · Toque ✕ para excluir</span></div><table><thead><tr><th>Data</th><th>Obra</th><th>Descrição</th><th>Resp.</th><th>Tipo</th><th>Pgto</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>':'');
+    (rec.length
+      ? '<div class="tw"><div class="tw-hdr" style="display:flex;justify-content:space-between;align-items:center">'+
+          '<span>'+tituloLista+'</span>'+
+          '<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">Segure para selecionar · Toque ✕ para excluir</span>'+
+        '</div>'+
+        '<table><thead><tr>'+headerCols+'</tr></thead><tbody>'+rows+'</tbody></table></div>'
+      : (obraId?'<div style="padding:20px;text-align:center;color:var(--text4);font-size:13px">Nenhum lançamento nesta obra</div>':''));
 
-  // Botão ✕ (desktop/direto)
+  // Botão ✕ direto
   document.querySelectorAll('#lanc-rec .btn-danger[data-id]').forEach(function(b){
     b.addEventListener('click',function(e){
       e.stopPropagation();
       delLanc(this.dataset.id,null);
-      rLancamentos();
+      atualizarListaLancs();
     });
   });
 
-  // Long press / seleção múltipla (mobile)
   bindLancSelection();
 }
 
@@ -2412,7 +2441,8 @@ function saveLanc(){
   document.getElementById('l-valor').value='';document.getElementById('l-data').value=hoje();
   document.getElementById('l-preview').innerHTML='';
   checkAlerta(obraId,data.substring(0,7));
-  rLancamentos();renderSidebarObras();
+  atualizarListaLancs();
+  renderSidebarObras();
 }
 
 function saveLancModal(){
