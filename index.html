@@ -2671,13 +2671,17 @@ document.getElementById('btn-exp').addEventListener('click',exportar);
 document.getElementById('nav-dashboard').addEventListener('click',function(){showPage('dashboard');});
 document.getElementById('nav-obras').addEventListener('click',function(){showPage('obras');});
 document.getElementById('nav-lancamentos').addEventListener('click',function(){showPage('lancamentos');});
+document.getElementById('nav-historico').addEventListener('click',function(){showPage('historico');});
 document.getElementById('nav-excluidos').addEventListener('click',function(){showPage('excluidos');});
 document.getElementById('nav-fechamentos').addEventListener('click',function(){showPage('fechamentos');});
 document.getElementById('nav-relatorio').addEventListener('click',function(){showPage('relatorio');});
 document.getElementById('nav-config').addEventListener('click',function(){showPage('config');});
 document.getElementById('btn-salvar-lanc').addEventListener('click',saveLanc);
-document.getElementById('btn-filtrar-hist').addEventListener('click',filtrarHistorico);
-document.getElementById('btn-limpar-hist').addEventListener('click',function(){
+var _btnFiltHist=document.getElementById('btn-filtrar-hist');
+var _btnLimpHist=document.getElementById('btn-limpar-hist');
+var _hBusca=document.getElementById('h-busca');
+if(_btnFiltHist)_btnFiltHist.addEventListener('click',filtrarHistorico);
+if(_btnLimpHist)_btnLimpHist.addEventListener('click',function(){
   document.getElementById('h-busca').value='';
   document.getElementById('h-obra').value='';
   document.getElementById('h-tipo').value='';
@@ -2685,13 +2689,14 @@ document.getElementById('btn-limpar-hist').addEventListener('click',function(){
   document.getElementById('h-ate').value='';
   filtrarHistorico();
 });
-document.getElementById('h-busca').addEventListener('keydown',function(e){
-  if(e.key==='Enter') filtrarHistorico();
-});
-document.getElementById('h-busca').addEventListener('input',function(){
-  // Busca em tempo real se tiver 3+ caracteres
-  if(this.value.length===0||this.value.length>=3) filtrarHistorico();
-});
+if(_hBusca){
+  _hBusca.addEventListener('keydown',function(e){
+    if(e.key==='Enter') filtrarHistorico();
+  });
+  _hBusca.addEventListener('input',function(){
+    if(this.value.length===0||this.value.length>=3) filtrarHistorico();
+  });
+}
 document.getElementById('cfg-exp').addEventListener('click',exportar);
 document.getElementById('cfg-del').addEventListener('click',function(){
   if(!confirm('Apagar TODOS os dados?'))return;
