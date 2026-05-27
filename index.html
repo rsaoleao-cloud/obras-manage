@@ -271,6 +271,9 @@ select.fi option{background:var(--bg2);color:var(--text)}
 .mobile-nav-btn.active{color:var(--accent)}
 .mobile-nav-btn .mn-icon{font-size:22px;line-height:1}
 .mobile-nav-btn.active .mn-icon{transform:scale(1.1)}
+.mnav-mais-item{display:flex;align-items:center;gap:12px;width:100%;padding:13px 20px;border:none;background:none;text-align:left;font-size:15px;font-family:var(--font);color:var(--text);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.mnav-mais-item:active{background:var(--bg3)}
+.mnav-mais-item span{font-size:20px;width:28px}
 
 /* FAB — botão flutuante nova obra */
 .fab{display:none;position:fixed;bottom:80px;right:18px;z-index:99;width:54px;height:54px;border-radius:50%;background:var(--accent);border:none;color:#fff;font-size:26px;cursor:pointer;box-shadow:0 4px 14px rgba(31,111,235,.5);align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;transition:transform .15s}
@@ -589,8 +592,16 @@ select.fi option{background:var(--bg2);color:var(--text)}
     <button class="mobile-nav-btn active" id="mnav-dashboard"><span class="mn-icon">📊</span>Dashboard</button>
     <button class="mobile-nav-btn" id="mnav-obras"><span class="mn-icon">🏗️</span>Obras</button>
     <button class="mobile-nav-btn" id="mnav-lancamentos"><span class="mn-icon">📝</span>Lançar</button>
+    <button class="mobile-nav-btn" id="mnav-historico"><span class="mn-icon">🗂️</span>Histórico</button>
     <button class="mobile-nav-btn" id="mnav-relatorio"><span class="mn-icon">📋</span>Relatório</button>
-    <button class="mobile-nav-btn" id="mnav-config"><span class="mn-icon">⚙️</span>Config</button>
+    <button class="mobile-nav-btn" id="mnav-mais"><span class="mn-icon">⋯</span>Mais</button>
+  </div>
+
+  <!-- MENU "MAIS" mobile -->
+  <div id="mnav-mais-menu" style="display:none;position:fixed;bottom:62px;left:0;right:0;background:var(--card);border-top:1px solid var(--border);box-shadow:0 -4px 16px rgba(0,0,0,.12);z-index:101;padding:8px 0">
+    <button class="mnav-mais-item" data-page="fechamentos"><span>🔒</span> Fechamentos</button>
+    <button class="mnav-mais-item" data-page="excluidos"><span>🗑️</span> Exclusões</button>
+    <button class="mnav-mais-item" data-page="config"><span>⚙️</span> Configurações</button>
   </div>
 </nav>
 
@@ -1498,8 +1509,12 @@ function rDetalhe(obraId){
 
 // ===== LANÇAMENTOS =====
 function rLancamentos(){
-  var opts=S.obras.map(function(o){return'<option value="'+o.id+'">'+o.nome+'</option>';}).join('');
-  document.getElementById('l-obra').innerHTML=opts||'<option value="">Nenhuma obra</option>';
+  var selEl=document.getElementById('l-obra');
+  var obraAnterior=selEl?selEl.value:''; // guarda obra selecionada antes de repopular
+  var opts=S.obras.map(function(o){return'<option value="'+o.id+'"'+(o.id===obraAnterior?' selected':'')+'>'+o.nome+'</option>';}).join('');
+  selEl.innerHTML=opts||'<option value="">Nenhuma obra</option>';
+  // Restaura seleção anterior se ainda existe
+  if(obraAnterior) selEl.value=obraAnterior;
   document.getElementById('l-data').value=hoje();
   atualizarPreview();
   bindAllMoney();
@@ -2725,15 +2740,44 @@ var dn=new Date();
 var dias=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 document.getElementById('date-chip').textContent=dias[dn.getDay()]+', '+fD(hoje());
 
-var mnavIds=['dashboard','obras','lancamentos','relatorio','config'];
+var mnavIds=['dashboard','obras','lancamentos','historico','relatorio'];
 mnavIds.forEach(function(p){
   var btn=document.getElementById('mnav-'+p);
   if(btn){
     btn.addEventListener('click',function(){
+      fecharMaisMenu();
       showPage(p);
     });
   }
 });
+
+// Botão MAIS
+var _maisAberto=false;
+document.getElementById('mnav-mais').addEventListener('click',function(){
+  _maisAberto=!_maisAberto;
+  document.getElementById('mnav-mais-menu').style.display=_maisAberto?'block':'none';
+  this.classList.toggle('active',_maisAberto);
+});
+
+// Itens do menu Mais
+document.querySelectorAll('.mnav-mais-item').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    fecharMaisMenu();
+    showPage(this.dataset.page);
+  });
+});
+
+document.addEventListener('click',function(e){
+  if(_maisAberto&&!e.target.closest('#mnav-mais')&&!e.target.closest('#mnav-mais-menu'))fecharMaisMenu();
+});
+
+function fecharMaisMenu(){
+  _maisAberto=false;
+  var m=document.getElementById('mnav-mais-menu');
+  if(m)m.style.display='none';
+  var b=document.getElementById('mnav-mais');
+  if(b)b.classList.remove('active');
+}
 
 // FAB mobile → nova obra
 document.getElementById('fab-nova-obra').addEventListener('click',function(){
