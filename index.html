@@ -495,12 +495,23 @@ select.fi option{background:var(--bg2);color:var(--text)}
 
     <!-- HISTÓRICO -->
     <div class="page" id="page-historico">
-      <div style="display:flex;gap:10px;margin-bottom:18px;align-items:flex-end;flex-wrap:wrap">
-        <div><label class="flbl" style="display:block">Obra</label><select class="fi" id="h-obra" style="width:200px"></select></div>
-        <div><label class="flbl" style="display:block">Categoria</label><select class="fi" id="h-tipo" style="width:160px"><option value="">Todas</option><option value="despesa">💼 Despesa</option><option value="almoco">🍽 Almoço</option><option value="hospedagem">🏨 Hospedagem</option><option value="combustivel">⛽ Combustível</option><option value="prestador">🧑‍🔧 Prestador</option><option value="peca">🔩 Peça</option></select></div>
-        <div><label class="flbl" style="display:block">De</label><input class="fi" id="h-de" type="date" style="width:145px"></div>
-        <div><label class="flbl" style="display:block">Até</label><input class="fi" id="h-ate" type="date" style="width:145px"></div>
-        <button class="btn btn-primary" id="btn-filtrar-hist">Filtrar</button>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:14px;box-shadow:var(--shadow)">
+        <!-- Busca por descrição — campo principal -->
+        <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+          <div style="flex:1;position:relative">
+            <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px">🔍</span>
+            <input class="fi" id="h-busca" placeholder="Buscar por descrição..." style="padding-left:34px;font-size:14px" autocomplete="off">
+          </div>
+          <button class="btn btn-primary" id="btn-filtrar-hist">Buscar</button>
+          <button class="btn" id="btn-limpar-hist">✕</button>
+        </div>
+        <!-- Filtros avançados -->
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+          <div><label class="flbl" style="display:block">Obra</label><select class="fi" id="h-obra" style="width:185px"></select></div>
+          <div><label class="flbl" style="display:block">Categoria</label><select class="fi" id="h-tipo" style="width:155px"><option value="">Todas</option><option value="despesa">💼 Despesa</option><option value="almoco">🍽 Almoço</option><option value="hospedagem">🏨 Hospedagem</option><option value="combustivel">⛽ Combustível</option><option value="prestador">🧑‍🔧 Prestador</option><option value="peca">🔩 Peça</option></select></div>
+          <div><label class="flbl" style="display:block">De</label><input class="fi" id="h-de" type="date" style="width:140px"></div>
+          <div><label class="flbl" style="display:block">Até</label><input class="fi" id="h-ate" type="date" style="width:140px"></div>
+        </div>
       </div>
       <div id="hist-body"></div>
     </div>
@@ -1671,31 +1682,161 @@ function rHistorico(){
   document.getElementById('h-obra').innerHTML=opts;
   filtrarHistorico();
 }
+
 function filtrarHistorico(){
-  var obra=document.getElementById('h-obra').value;
-  var tipo=document.getElementById('h-tipo').value;
-  var de=document.getElementById('h-de').value;
-  var ate=document.getElementById('h-ate').value;
-  var lancs=S.lancamentos.filter(function(l){
-    if(obra&&l.obraId!==obra)return false;
-    if(tipo&&l.tipo!==tipo)return false;
-    if(de&&l.data<de)return false;
-    if(ate&&l.data>ate)return false;
+  var obra  = document.getElementById('h-obra').value;
+  var tipo  = document.getElementById('h-tipo').value;
+  var de    = document.getElementById('h-de').value;
+  var ate   = document.getElementById('h-ate').value;
+  var busca = (document.getElementById('h-busca').value||'').trim().toLowerCase();
+
+  var lancs = S.lancamentos.filter(function(l){
+    if(obra  && l.obraId!==obra) return false;
+    if(tipo  && l.tipo!==tipo)   return false;
+    if(de    && l.data<de)       return false;
+    if(ate   && l.data>ate)      return false;
+    if(busca && l.descricao.toLowerCase().indexOf(busca)===-1) return false;
     return true;
   }).slice().sort(function(a,b){return b.data.localeCompare(a.data);});
-  var total=lancs.reduce(function(a,l){return a+Number(l.valor);},0);
-  var rows='';
+
+  var total = lancs.reduce(function(a,l){return a+Number(l.valor);},0);
+
+  var rows = '';
   lancs.forEach(function(l){
-    var o=findO(l.obraId);
-    var tb=catBadge(l.tipo);
-    var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':'<span style="font-size:10px;color:var(--text4)">À vista</span>';
-    rows+='<tr><td>'+fD(l.data)+'</td><td>'+(o?o.nome:'—')+'</td><td>'+l.descricao+'</td><td>'+(l.resp||'—')+'</td><td>'+tb+'</td><td>'+pb+'</td><td style="font-family:var(--mono);text-align:right">'+fM(l.valor)+'</td></tr>';
+    var o   = findO(l.obraId);
+    var tb  = catBadge(l.tipo);
+    var pb  = l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':'<span style="font-size:10px;color:var(--text4)">À vista</span>';
+    // Destaca o termo buscado
+    var desc = l.descricao;
+    if(busca) desc = desc.replace(new RegExp('('+busca.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<mark style="background:#fef08a;border-radius:2px;padding:0 2px">$1</mark>');
+    rows +=
+      '<tr class="hist-row" data-id="'+l.id+'">'+
+        '<td style="white-space:nowrap">'+fD(l.data)+'</td>'+
+        '<td>'+(o?o.nome:'—')+'</td>'+
+        '<td>'+desc+'</td>'+
+        '<td>'+(l.resp||'—')+'</td>'+
+        '<td>'+tb+'</td>'+
+        '<td>'+pb+'</td>'+
+        '<td style="font-family:var(--mono);text-align:right;font-weight:600">'+fM(l.valor)+'</td>'+
+        '<td style="white-space:nowrap">'+
+          '<button class="btn" style="font-size:11px;padding:3px 9px;margin-right:4px" data-id="'+l.id+'" data-act="edit">✏️</button>'+
+          '<button class="btn btn-danger" style="font-size:11px;padding:3px 9px" data-id="'+l.id+'" data-act="del">🗑</button>'+
+        '</td>'+
+      '</tr>';
   });
-  if(!rows)rows='<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text4)">Nenhum lançamento encontrado</td></tr>';
-  document.getElementById('hist-body').innerHTML=
+
+  if(!rows) rows='<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--text4)">'+(busca?'Nenhum lançamento com "'+busca+'" encontrado':'Nenhum lançamento encontrado')+'</td></tr>';
+
+  document.getElementById('hist-body').innerHTML =
     '<div class="tw">'+
-    '<div class="tw-hdr" style="display:flex;justify-content:space-between"><span>'+lancs.length+' lançamentos encontrados</span><span style="font-family:var(--mono);color:var(--accent2)">Total: '+fM(total)+'</span></div>'+
-    '<table><thead><tr><th>Data</th><th>Obra</th><th>Descrição</th><th>Responsável</th><th>Tipo</th><th>Pgto</th><th style="text-align:right">Valor</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+      '<div class="tw-hdr" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">'+
+        '<span>'+lancs.length+' lançamento'+(lancs.length!==1?'s':'')+(busca?' para "'+busca+'"':'')+'</span>'+
+        '<span style="font-family:var(--mono);color:var(--accent)">Total: '+fM(total)+'</span>'+
+      '</div>'+
+      '<table><thead><tr><th>Data</th><th>Obra</th><th>Descrição</th><th>Resp.</th><th>Tipo</th><th>Pgto</th><th style="text-align:right">Valor</th><th>Ações</th></tr></thead>'+
+      '<tbody>'+rows+'</tbody></table>'+
+    '</div>';
+
+  // Botões editar e excluir
+  document.querySelectorAll('#hist-body [data-act="edit"]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      editarLanc(this.dataset.id);
+    });
+  });
+  document.querySelectorAll('#hist-body [data-act="del"]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      delLanc(this.dataset.id, null);
+      // Recarrega após fechar modal
+      var check=setInterval(function(){
+        if(document.getElementById('modal').classList.contains('hidden')){
+          clearInterval(check); filtrarHistorico();
+        }
+      },200);
+    });
+  });
+}
+
+function editarLanc(id){
+  var l = S.lancamentos.find(function(x){return x.id===id;});
+  if(!l) return;
+  var o = findO(l.obraId);
+  var oOpts = S.obras.map(function(ob){
+    return'<option value="'+ob.id+'"'+(ob.id===l.obraId?' selected':'')+'>'+ob.nome+'</option>';
+  }).join('');
+  openModal(
+    '<div class="mtitle">✏️ Editar Lançamento</div>'+
+    '<div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:16px">'+
+      catBadge(l.tipo)+' &nbsp;'+fD(l.data)+' &nbsp;'+fM(l.valor)+
+    '</div>'+
+    '<div class="fl">'+
+      '<div class="fg"><label class="flbl">Obra</label><select class="fi" id="el-obra">'+oOpts+'</select></div>'+
+      '<div class="fg"><label class="flbl">Tipo de Despesa</label>'+
+        '<select class="fi" id="el-tipo">'+
+          '<option value="despesa"'+(l.tipo==='despesa'?' selected':'')+'>💼 Despesa</option>'+
+          '<option value="almoco"'+(l.tipo==='almoco'?' selected':'')+'>🍽 Almoço</option>'+
+          '<option value="hospedagem"'+(l.tipo==='hospedagem'?' selected':'')+'>🏨 Hospedagem</option>'+
+          '<option value="combustivel"'+(l.tipo==='combustivel'?' selected':'')+'>⛽ Combustível</option>'+
+          '<option value="prestador"'+(l.tipo==='prestador'?' selected':'')+'>🧑‍🔧 Prestador</option>'+
+          '<option value="peca"'+(l.tipo==='peca'?' selected':'')+'>🔩 Peça / Material</option>'+
+        '</select>'+
+      '</div>'+
+    '</div>'+
+    '<div class="fg"><label class="flbl">Descrição</label><input class="fi" id="el-desc" value="'+l.descricao+'"></div>'+
+    '<div class="fl">'+
+      '<div class="fg"><label class="flbl">Responsável</label><input class="fi" id="el-resp" value="'+(l.resp||'')+'"></div>'+
+      '<div class="fg"><label class="flbl">Valor (R$)</label>'+
+        '<div class="money-wrap"><span class="money-prefix">R$</span><input class="fi money-input" id="el-valor" type="text" inputmode="numeric" value="'+formatMoney(l.valor)+'"></div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="fg"><label class="flbl">Data</label><input class="fi" id="el-data" type="date" value="'+l.data+'"></div>'+
+    '<div id="el-aviso-fech" style="display:none" class="alert al-warn" style="margin-top:8px"><span>⚠</span><span>Mês fechado — apenas data e descrição podem ser editados</span></div>'+
+    '<div class="mactions">'+
+      '<button class="btn" id="el-cancel">Cancelar</button>'+
+      '<button class="btn btn-primary" id="el-salvar">💾 Salvar alterações</button>'+
+    '</div>'
+  );
+
+  // Bind money
+  bindMoney(document.getElementById('el-valor'));
+
+  // Aviso se mês fechado
+  if(mesFechado(l.mes)){
+    document.getElementById('el-aviso-fech').style.display='flex';
+    document.getElementById('el-valor').disabled=true;
+    document.getElementById('el-tipo').disabled=true;
+    document.getElementById('el-obra').disabled=true;
+  }
+
+  document.getElementById('el-cancel').addEventListener('click', closeModal);
+  document.getElementById('el-salvar').addEventListener('click', function(){
+    var novaDesc  = document.getElementById('el-desc').value.trim();
+    var novaResp  = document.getElementById('el-resp').value.trim();
+    var novoValor = getMoneyVal('el-valor');
+    var novaData  = document.getElementById('el-data').value;
+    var novoTipo  = document.getElementById('el-tipo').value;
+    var novaObra  = document.getElementById('el-obra').value;
+    if(!novaDesc){ document.getElementById('el-desc').style.borderColor='#dc2626'; document.getElementById('el-desc').focus(); return; }
+    if(!novoValor||novoValor<=0){ document.getElementById('el-valor').style.borderColor='#dc2626'; document.getElementById('el-valor').focus(); return; }
+    // Aplica as alterações
+    var idx = S.lancamentos.findIndex(function(x){return x.id===id;});
+    if(idx===-1){closeModal();return;}
+    var novo = Object.assign({}, S.lancamentos[idx]);
+    if(!mesFechado(l.mes)){
+      novo.tipo  = novoTipo;
+      novo.valor = novoValor;
+      novo.obraId= novaObra;
+    }
+    novo.descricao = novaDesc;
+    novo.resp      = novaResp;
+    novo.data      = novaData;
+    novo.mes       = novaData.substring(0,7);
+    S.lancamentos[idx] = novo;
+    sv();
+    pushLanc(novo);
+    closeModal();
+    filtrarHistorico();
+    syncChip('sync','Salvando...');
+  });
 }
 
 // ===== RELATÓRIO =====
@@ -2536,6 +2677,21 @@ document.getElementById('nav-relatorio').addEventListener('click',function(){sho
 document.getElementById('nav-config').addEventListener('click',function(){showPage('config');});
 document.getElementById('btn-salvar-lanc').addEventListener('click',saveLanc);
 document.getElementById('btn-filtrar-hist').addEventListener('click',filtrarHistorico);
+document.getElementById('btn-limpar-hist').addEventListener('click',function(){
+  document.getElementById('h-busca').value='';
+  document.getElementById('h-obra').value='';
+  document.getElementById('h-tipo').value='';
+  document.getElementById('h-de').value='';
+  document.getElementById('h-ate').value='';
+  filtrarHistorico();
+});
+document.getElementById('h-busca').addEventListener('keydown',function(e){
+  if(e.key==='Enter') filtrarHistorico();
+});
+document.getElementById('h-busca').addEventListener('input',function(){
+  // Busca em tempo real se tiver 3+ caracteres
+  if(this.value.length===0||this.value.length>=3) filtrarHistorico();
+});
 document.getElementById('cfg-exp').addEventListener('click',exportar);
 document.getElementById('cfg-del').addEventListener('click',function(){
   if(!confirm('Apagar TODOS os dados?'))return;
