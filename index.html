@@ -379,7 +379,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
   <aside class="sidebar">
     <div class="logo">
       <div class="logo-title">SP8 Obras</div>
-      <div class="logo-sub">PRO · GESTÃO COMPLETA v5.1</div>
+      <div class="logo-sub">PRO · GESTÃO COMPLETA v5.2</div>
     </div>
     <div class="nav">
       <div class="nav-lbl">Menu</div>
@@ -402,7 +402,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
       <div class="hdr-title" id="hdr-title">Dashboard</div>
     </div>
     <div class="hdr-right">
-      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v5.1</span>
+      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v5.2</span>
       <span id="user-chip" class="user-avatar-chip" style="display:none">
         <span class="user-avatar-sm" id="user-avatar-letter">?</span>
         <span id="user-nome-chip">—</span>
@@ -1200,7 +1200,7 @@ function rDashboard(){
   dashLancsLbl.textContent='Lançamentos recentes — duplo clique para excluir';
   var lRows=recLancs.map(function(l){
     var o2=findO(l.obraId);
-    var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':l.pgto==='30d'?'<span style="font-size:10px;color:#0891b2">📅 30d</span>':l.pgto==='cartao'?'<span style="font-size:10px;color:#7c3aed">💳 Cartão</span>':'';
+    var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':l.pgto==='30d'?'<span class="badge" style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc">📅 30 dias</span>':l.pgto==='cartao'?'<span class="badge" style="background:#faf5ff;color:#7c3aed;border:1px solid #ddd6fe">💳 Cartão</span>':l.pgto==='avista'?'<span style="font-size:10px;color:var(--text4)">💵 À vista</span>':'';
     return'<tr class="dash-lanc-row" data-id="'+l.id+'" title="Duplo clique para excluir" style="-webkit-user-select:none;user-select:none;cursor:pointer">'+
       '<td>'+fD(l.data)+'</td>'+
       '<td>'+(o2?o2.nome:'—')+'</td>'+
@@ -1339,7 +1339,7 @@ function rObraDashboard(obraId){
 
     // Lançamentos do mês
     var rows=lancs.slice().sort(function(a,b){return b.data.localeCompare(a.data);}).map(function(l){
-      var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':l.pgto==='30d'?'<span style="font-size:10px;color:#0891b2">📅 30d</span>':l.pgto==='cartao'?'<span style="font-size:10px;color:#7c3aed">💳 Cartão</span>':'';
+      var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':l.pgto==='30d'?'<span class="badge" style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc">📅 30 dias</span>':l.pgto==='cartao'?'<span class="badge" style="background:#faf5ff;color:#7c3aed;border:1px solid #ddd6fe">💳 Cartão</span>':l.pgto==='avista'?'<span style="font-size:10px;color:var(--text4)">💵 À vista</span>':'';
       return'<tr><td style="white-space:nowrap">'+fD(l.data)+'</td><td>'+l.descricao+'</td><td>'+(l.resp||'—')+'</td><td>'+catBadge(l.tipo)+'</td><td>'+pb+'</td><td style="font-family:var(--mono);text-align:right">'+fM(l.valor)+'</td></tr>';
     }).join('');
 
@@ -1570,10 +1570,7 @@ function atualizarListaLancs(){
   rec.forEach(function(l){
     var ob=findO(l.obraId);
     var tb=catBadge(l.tipo);
-    var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':
-       l.pgto==='30d'?'<span style="font-size:10px;color:#0891b2">📅 30d</span>':
-       l.pgto==='cartao'?'<span style="font-size:10px;color:#7c3aed">💳 Cartão</span>':
-       '<span style="font-size:10px;color:var(--text4)">À vista</span>';
+    var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':l.pgto==='30d'?'<span class="badge" style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc">📅 30 dias</span>':l.pgto==='cartao'?'<span class="badge" style="background:#faf5ff;color:#7c3aed;border:1px solid #ddd6fe">💳 Cartão</span>':l.pgto==='avista'?'<span style="font-size:10px;color:var(--text4)">💵 À vista</span>':'';
     rows+='<tr class="lanc-row" data-id="'+l.id+'">'+
       '<td>'+fD(l.data)+'</td>'+
       (obraId?'':'<td>'+(ob?ob.nome:'—')+'</td>')+
@@ -1728,11 +1725,9 @@ function atualizarPreview(){
   var rows='';
 
   if(tipo==='30d'){
-    var r=addDias(dataVal,30);
-    rows='<div class="parc-row"><span>📅 Vencimento em '+fD(r.data)+' ('+mesLabel(r.mes)+')</span><span>'+fM(valor)+'</span></div>';
+    rows='<div class="parc-row"><span>📅 Prazo 30 dias — vence em '+fD(addDias(dataVal,30).data)+'</span><span>'+fM(valor)+'</span></div>';
   } else if(tipo==='cartao'){
-    var r=addDias(dataVal,30);
-    rows='<div class="parc-row"><span>💳 Fatura em '+fD(r.data)+' ('+mesLabel(r.mes)+')</span><span>'+fM(valor)+'</span></div>';
+    rows='<div class="parc-row"><span>💳 Cartão de crédito</span><span>'+fM(valor)+'</span></div>';
   } else {
     for(var i=0;i<n;i++){
       var r=addDias(dataVal, i*30);
@@ -2059,7 +2054,7 @@ function renderRelatorioResultado(){
 
   var makeRows = function(arr){
     return arr.slice().sort(function(a,b){return b.data.localeCompare(a.data);}).map(function(l){
-      var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':l.pgto==='30d'?'<span style="font-size:10px;color:#0891b2">📅 30d</span>':l.pgto==='cartao'?'<span style="font-size:10px;color:#7c3aed">💳 Cartão</span>':'';
+      var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':l.pgto==='30d'?'<span class="badge" style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc">📅 30 dias</span>':l.pgto==='cartao'?'<span class="badge" style="background:#faf5ff;color:#7c3aed;border:1px solid #ddd6fe">💳 Cartão</span>':l.pgto==='avista'?'<span style="font-size:10px;color:var(--text4)">💵 À vista</span>':'';
       var desc=l.descricao;
       if(REL.busca) desc=desc.replace(new RegExp('('+REL.busca+')','gi'),'<mark style="background:#fef08a;color:#111;border-radius:2px">$1</mark>');
       return'<tr><td style="white-space:nowrap">'+fD(l.data)+'</td><td>'+desc+'</td><td>'+(l.resp||'—')+'</td><td>'+catBadge(l.tipo)+'</td><td>'+pb+'</td><td style="font-family:var(--mono);text-align:right">'+fM(l.valor)+'</td></tr>';
@@ -2250,11 +2245,9 @@ function atualizarPreviewModal(){
   var parcVal=valor/n;
   var rows='';
   if(tipo==='30d'){
-    var r=addDias(dataVal,30);
-    rows='<div class="parc-row"><span>📅 Vencimento '+fD(r.data)+' ('+mesLabel(r.mes)+')</span><span>'+fM(valor)+'</span></div>';
+    rows='<div class="parc-row"><span>📅 Prazo 30 dias</span><span>'+fM(valor)+'</span></div>';
   } else if(tipo==='cartao'){
-    var r=addDias(dataVal,30);
-    rows='<div class="parc-row"><span>💳 Fatura '+fD(r.data)+' ('+mesLabel(r.mes)+')</span><span>'+fM(valor)+'</span></div>';
+    rows='<div class="parc-row"><span>💳 Cartão de crédito</span><span>'+fM(valor)+'</span></div>';
   } else {
     for(var i=0;i<n;i++){
       var r=addDias(dataVal, i*30);
@@ -2416,13 +2409,10 @@ function criarLancamentos(obraId,tipo,desc,resp,valor,data,pgto,nparcelas){
   // Para 30d: data de vencimento = data + 30 dias
   // Para cartão: mantém data informada mas marca como cartão
   var parcelas=[];
-  if(pgto==='30d'){
-    var r=addDias(data, 30);
-    parcelas.push(r);
-  } else if(pgto==='cartao'){
-    // Cartão: vence no mês seguinte (30 dias)
-    var r=addDias(data, 30);
-    parcelas.push(r);
+  // 30d e cartao: lançamento na data informada (sem alterar data)
+  if(pgto==='30d'||pgto==='cartao'){
+    var dp=data.split('-');
+    parcelas.push({data:data, mes:dp[0]+'-'+dp[1]});
   } else {
     for(var i=0;i<n;i++){
       parcelas.push(addDias(data, i*30));
