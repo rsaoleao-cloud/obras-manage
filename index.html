@@ -1727,12 +1727,15 @@ function atualizarPreview(){
   if(tipo==='30d'){
     rows='<div class="parc-row"><span>📅 Prazo 30 dias — vence em '+fD(addDias(dataVal,30).data)+'</span><span>'+fM(valor)+'</span></div>';
   } else if(tipo==='cartao'){
-    rows='<div class="parc-row"><span>💳 Cartão de crédito</span><span>'+fM(valor)+'</span></div>';
+    rows='<div class="parc-row"><span>💳 Cartão — competência '+mesLabel(dataVal.substring(0,7))+'</span><span>'+fM(valor)+'</span></div>';
   } else {
     for(var i=0;i<n;i++){
       var r=addDias(dataVal, i*30);
-      var mLabel=fD(r.data)+' ('+mesLabel(r.mes)+')';
-      rows+='<div class="parc-row"><span>'+i+1+'/'+n+' · '+mLabel+'</span><span>'+fM(parcVal)+'</span></div>';
+      rows+='<div class="parc-row">'+
+        '<span>'+( i+1)+'/'+n+' · '+fD(r.data)+'</span>'+
+        '<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">'+mesLabel(r.mes)+'</span>'+
+        '<span>'+fM(parcVal)+'</span>'+
+      '</div>';
     }
     rows+='<div class="parc-row" style="font-weight:600"><span>Total</span><span>'+fM(valor)+'</span></div>';
   }
@@ -2320,12 +2323,13 @@ function podeFacharMes(){
 }
 function fecharMes(mes, obraId){
   if(!S.fechamentos)S.fechamentos=[];
-  if(mesFechado(mes)){
-    alert('O mês '+mesLabel(mes)+' já foi fechado!');
-    return false;
-  }
-  if(!podeFacharMes()){
-    alert('O fechamento só pode ser realizado a partir do dia 20 do mês.');
+  // Verifica se já existe fechamento para esta combinação mes+obra
+  var jaExiste = S.fechamentos.some(function(f){
+    return f.mes===mes && (obraId ? f.obraId===obraId : !f.obraId);
+  });
+  if(jaExiste){
+    var o2=obraId?findO(obraId):null;
+    alert('Fechamento de '+mesLabel(mes)+(o2?' — '+o2.nome:'')+' já realizado!');
     return false;
   }
   var obras = obraId ? [findO(obraId)] : S.obras;
@@ -2348,9 +2352,12 @@ function fecharMes(mes, obraId){
     };
   }).filter(Boolean);
 
+  var o3=obraId?findO(obraId):null;
   var fechamento = {
     id:'f'+Date.now(),
     mes:mes,
+    obraId:obraId||'',
+    obraNome:o3?o3.nome:'Todas as obras',
     fechadoEm:new Date().toISOString(),
     fechadoPor:USUARIO_ATUAL.nome||'—',
     totalGeral:totalGeral,
@@ -2358,7 +2365,6 @@ function fecharMes(mes, obraId){
   };
   S.fechamentos.push(fechamento);
   sv();
-  // Push para Firestore
   if(FB){
     var doc={};
     Object.keys(fechamento).forEach(function(k){
@@ -2406,20 +2412,21 @@ function criarLancamentos(obraId,tipo,desc,resp,valor,data,pgto,nparcelas){
   var n=pgto==='avista'?1:pgto==='30d'?1:pgto==='cartao'?1:pgto==='3x'?3:pgto==='5x'?5:parseInt(nparcelas)||1;
   var parcVal=Number(valor)/n;
 
-  // Para 30d: data de vencimento = data + 30 dias
-  // Para cartão: mantém data informada mas marca como cartão
+  // Calcula data e mês de cada parcela
+  // À vista / 30d / cartão: mês do gasto
+  // Parcelado: cada parcela no seu mês de pagamento (+30 dias)
   var parcelas=[];
-  // 30d e cartao: lançamento na data informada (sem alterar data)
-  if(pgto==='30d'||pgto==='cartao'){
-    var dp=data.split('-');
-    parcelas.push({data:data, mes:dp[0]+'-'+dp[1]});
+  if(pgto==='30d'||pgto==='cartao'||pgto==='avista'){
+    parcelas.push({data:data, mes:data.substring(0,7)});
   } else {
+    // 1ª parcela no mês do gasto, demais a cada 30 dias
     for(var i=0;i<n;i++){
-      parcelas.push(addDias(data, i*30));
+      var r=addDias(data, i*30);
+      parcelas.push({data:r.data, mes:r.mes});
     }
   }
 
-  // Verifica meses fechados antes de criar qualquer parcela
+  // Verifica meses fechados
   for(var c=0;c<parcelas.length;c++){
     if(mesFechado(parcelas[c].mes)){
       alert('⚠ O mês '+mesLabel(parcelas[c].mes)+' está FECHADO.\nNão é possível lançar neste período.');
@@ -2574,45 +2581,50 @@ function delLanc(id,obraId){
 // ===== FECHAMENTOS =====
 function rFechamentos(){
   var c=document.getElementById('fechamentos-content');
-  var mes=mesAtual();
   var dn=new Date();
-  var podeFachar=dn.getDate()>=20;
-  var jaFechou=mesFechado(mes);
+  var mesAtualStr=mesAtual();
 
-  // Botão de fechar mês atual
-  var btnFechar='';
-  if(!jaFechou && podeFachar){
-    btnFechar='<div class="alert al-info" style="margin-bottom:16px">'+
-      '<span>📋</span>'+
-      '<div style="flex:1">Hoje é dia '+dn.getDate()+' — o mês <strong>'+mesLabel(mes)+'</strong> pode ser fechado.<br>'+
-      '<small style="color:var(--text3)">Após o fechamento, nenhum lançamento pode ser feito neste mês.</small></div>'+
-      '<button class="btn btn-primary" id="btn-fechar-mes" style="margin-left:12px;flex-shrink:0">🔒 Fechar '+mesLabel(mes)+'</button>'+
+  // Opções de obras
+  var optsObras='<option value="">— Selecione uma obra —</option>'+S.obras.map(function(o){
+    return'<option value="'+o.id+'">'+o.nome+'</option>';
+  }).join('');
+
+  var painelFechar=
+    '<div class="fcard" style="margin-bottom:18px;border-color:rgba(30,110,217,.3)">'+
+      '<div class="ftitle" style="margin-bottom:14px">🔒 Fechar período</div>'+
+      '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">'+
+        '<div style="flex:1;min-width:180px">'+
+          '<label class="flbl" style="display:block;margin-bottom:6px">① Obra</label>'+
+          '<select class="fi" id="sel-obra-fechar">'+optsObras+'</select>'+
+        '</div>'+
+        '<div style="flex:1;min-width:180px">'+
+          '<label class="flbl" style="display:block;margin-bottom:6px">② Mês</label>'+
+          '<select class="fi" id="sel-mes-fechar" disabled><option value="">Selecione a obra primeiro</option></select>'+
+        '</div>'+
+        '<button class="btn btn-primary" id="btn-fechar-mes" style="padding:10px 20px;flex-shrink:0" disabled>🔒 Fechar</button>'+
+      '</div>'+
+      '<div id="fechar-mes-info" style="font-size:12px;color:var(--text3);font-family:var(--mono);min-height:18px"></div>'+
+      '<p style="font-size:11px;color:var(--text3);margin-top:8px">Após o fechamento nenhum novo lançamento poderá ser feito no período.</p>'+
     '</div>';
-  } else if(!jaFechou && !podeFachar){
-    btnFechar='<div class="alert al-warn" style="margin-bottom:16px"><span>⏳</span><span>O fechamento de <strong>'+mesLabel(mes)+'</strong> estará disponível a partir do <strong>dia 20</strong>.</span></div>';
-  } else if(jaFechou){
-    var f=getFechamento(mes);
-    btnFechar='<div class="alert al-ok" style="margin-bottom:16px"><span>🔒</span><span>Mês <strong>'+mesLabel(mes)+'</strong> fechado em <strong>'+fD(f.fechadoEm.substring(0,10))+'</strong> por <strong>'+f.fechadoPor+'</strong></span></div>';
-  }
 
-  // Lista de fechamentos anteriores
+  // Lista de fechamentos realizados
   var lista=(S.fechamentos||[]).slice().sort(function(a,b){return b.mes.localeCompare(a.mes);});
   var rows='';
   if(!lista.length){
-    rows='<div class="empty"><div class="empty-icon">🔒</div><div class="empty-text">Nenhum mês fechado ainda.<br>O fechamento fica disponível todo dia 20.</div></div>';
+    rows='<div class="empty"><div class="empty-icon">🔒</div><div class="empty-text">Nenhum mês fechado ainda.</div></div>';
   } else {
     rows=lista.map(function(f){
       var resumo=typeof f.resumo==='string'?JSON.parse(f.resumo):f.resumo;
       var obraRows=resumo.map(function(r){
         return'<tr>'+
           '<td>'+r.obra+'</td>'+
-          '<td style="font-family:var(--mono);text-align:right">'+fM(r.despesa)+'</td>'+
-          '<td style="font-family:var(--mono);text-align:right">'+fM(r.almoco)+'</td>'+
-          '<td style="font-family:var(--mono);text-align:right">'+fM(r.hospedagem)+'</td>'+
-          '<td style="font-family:var(--mono);text-align:right">'+fM(r.combustivel)+'</td>'+
-          '<td style="font-family:var(--mono);text-align:right">'+fM(r.prestador)+'</td>'+
-          '<td style="font-family:var(--mono);text-align:right">'+fM(r.peca)+'</td>'+
-          '<td style="font-family:var(--mono);text-align:right;font-weight:700;color:var(--accent)">'+fM(r.total)+'</td>'+
+          '<td style="font-family:var(--mono);text-align:right">'+fM(r.despesa||0)+'</td>'+
+          '<td style="font-family:var(--mono);text-align:right">'+fM(r.almoco||0)+'</td>'+
+          '<td style="font-family:var(--mono);text-align:right">'+fM(r.hospedagem||0)+'</td>'+
+          '<td style="font-family:var(--mono);text-align:right">'+fM(r.combustivel||0)+'</td>'+
+          '<td style="font-family:var(--mono);text-align:right">'+fM(r.prestador||0)+'</td>'+
+          '<td style="font-family:var(--mono);text-align:right">'+fM(r.peca||0)+'</td>'+
+          '<td style="font-family:var(--mono);text-align:right;font-weight:700;color:var(--accent)">'+fM(r.total||0)+'</td>'+
           '<td style="font-size:10px;font-family:var(--mono);color:'+(Number(r.pctBudget)>=100?'#ef4444':Number(r.pctBudget)>=70?'#f59e0b':'#10b981')+'">'+r.pctBudget+'%</td>'+
         '</tr>';
       }).join('');
@@ -2621,35 +2633,132 @@ function rFechamentos(){
           '<div>'+
             '<div style="font-family:var(--serif);font-size:16px;font-weight:700">🔒 '+mesLabel(f.mes)+'</div>'+
             '<div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">'+
-              'Fechado em '+fD(f.fechadoEm.substring(0,10))+' por '+f.fechadoPor+' · '+
-              (resumo.length)+' obra(s)'+
+              (f.obraNome&&f.obraNome!=='Todas as obras'?'<span style="color:var(--accent)">'+f.obraNome+'</span> · ':'')+
+              'Fechado em '+fD(f.fechadoEm.substring(0,10))+' por '+f.fechadoPor+' · '+resumo.length+' obra(s)'+
             '</div>'+
           '</div>'+
-          '<div style="font-size:18px;font-weight:700;font-family:var(--mono);color:var(--accent)">'+fM(f.totalGeral)+'</div>'+
+          '<div style="font-size:18px;font-weight:700;font-family:var(--mono);color:var(--accent)">'+fM(f.totalGeral||0)+'</div>'+
         '</div>'+
         '<div class="tw"><table>'+
-          '<thead><tr><th>Obra</th><th style="text-align:right">Despesa</th><th style="text-align:right">Almoço</th><th style="text-align:right">Hospedagem</th><th style="text-align:right">Combustível</th><th style="text-align:right">Prestador</th><th style="text-align:right">Peça</th><th style="text-align:right">Total</th><th>Budget</th></tr></thead>'+
+          '<thead><tr><th>Obra</th><th style="text-align:right">Despesa</th><th style="text-align:right">Almoço</th><th style="text-align:right">Hospedagem</th><th style="text-align:right">Combustível</th><th style="text-align:right">Prestador</th><th style="text-align:right">Peça</th><th style="text-align:right">Total</th><th>Budget%</th></tr></thead>'+
           '<tbody>'+obraRows+'</tbody>'+
         '</table></div>'+
       '</div>';
     }).join('');
   }
 
-  c.innerHTML=btnFechar+rows;
+  c.innerHTML=painelFechar+(lista.length?'<div class="section-hdr" style="margin-bottom:12px">Histórico de fechamentos</div>':'')+rows;
 
-  // Evento botão fechar mês
-  var btn=document.getElementById('btn-fechar-mes');
-  if(btn){
-    btn.addEventListener('click',function(){
-      if(!confirm('Fechar o mês '+mesLabel(mes)+'?\n\nApós o fechamento, novos lançamentos neste mês serão bloqueados.')){return;}
-      var f=fecharMes(mes, null);
+  var selObra=document.getElementById('sel-obra-fechar');
+  var selMes=document.getElementById('sel-mes-fechar');
+  var btnFechar=document.getElementById('btn-fechar-mes');
+
+  function popularMesesObra(){
+    var oId=selObra.value;
+    if(!oId){
+      selMes.innerHTML='<option value="">Selecione a obra primeiro</option>';
+      selMes.disabled=true;
+      btnFechar.disabled=true;
+      document.getElementById('fechar-mes-info').textContent='';
+      return;
+    }
+    // Gera todos os meses desde o primeiro lançamento desta obra até o atual
+    var mesMin=mesAtualStr;
+    S.lancamentos.filter(function(l){return l.obraId===oId;}).forEach(function(l){
+      if(l.mes&&l.mes<mesMin)mesMin=l.mes;
+    });
+    // Se não tem lançamentos, mostra últimos 6 meses
+    if(mesMin===mesAtualStr){
+      var parts=mesAtualStr.split('-');
+      var yr2=parseInt(parts[0]); var mo2=parseInt(parts[1])-5;
+      while(mo2<1){mo2+=12;yr2--;}
+      mesMin=yr2+'-'+pad(mo2);
+    }
+    // Gera lista de meses
+    var meses=[];
+    var mm=mesAtualStr;
+    while(mm>=mesMin){
+      meses.push(mm);
+      var p2=mm.split('-'); var yr2=parseInt(p2[0]); var mo2=parseInt(p2[1])-1;
+      if(mo2<1){mo2=12;yr2--;}
+      mm=yr2+'-'+pad(mo2);
+    }
+    // Monta options com status
+    var opts=meses.map(function(m){
+      var jaFech=S.fechamentos.some(function(f){return f.mes===m&&f.obraId===oId;});
+      if(jaFech) return null; // não mostra meses já fechados desta obra
+      var nLancs=S.lancamentos.filter(function(l){return l.obraId===oId&&l.mes===m;}).length;
+      var tot=S.lancamentos.filter(function(l){return l.obraId===oId&&l.mes===m;}).reduce(function(a,l){return a+Number(l.valor);},0);
+      var label=mesLabel(m);
+      if(m===mesAtualStr) label+=' (atual)';
+      if(nLancs>0) label+=' · '+nLancs+' lançamento'+(nLancs!==1?'s':'')+' · '+fM(tot);
+      else label+=' · sem lançamentos';
+      return'<option value="'+m+'">'+label+'</option>';
+    }).filter(Boolean).join('');
+
+    if(!opts){
+      selMes.innerHTML='<option value="">Todos os meses já fechados</option>';
+      selMes.disabled=true;
+      btnFechar.disabled=true;
+    } else {
+      selMes.innerHTML=opts;
+      selMes.disabled=false;
+      btnFechar.disabled=false;
+    }
+    atualizarInfoFech();
+  }
+
+  function atualizarInfoFech(){
+    var oId=selObra?selObra.value:'';
+    var m=selMes?selMes.value:'';
+    var info=document.getElementById('fechar-mes-info');
+    if(!info)return;
+    if(!oId||!m){info.textContent='';return;}
+    var o2=findO(oId);
+    var lancs=S.lancamentos.filter(function(l){return l.obraId===oId&&l.mes===m;});
+    var tot=lancs.reduce(function(a,l){return a+Number(l.valor);},0);
+    if(lancs.length){
+      info.style.color='var(--text2)';
+      info.innerHTML='<strong>'+(o2?o2.nome:'')+'</strong> · '+mesLabel(m)+' · '+lancs.length+' lançamento'+(lancs.length!==1?'s':'')+' · Total: <strong>'+fM(tot)+'</strong>';
+    } else {
+      info.style.color='var(--text4)';
+      info.textContent='Sem lançamentos em '+mesLabel(m)+' para '+(o2?o2.nome:'esta obra');
+    }
+  }
+
+  if(selObra){
+    selObra.addEventListener('change', popularMesesObra);
+  }
+  if(selMes){
+    selMes.addEventListener('change', atualizarInfoFech);
+  }
+
+  if(btnFechar){
+    btnFechar.addEventListener('click',function(){
+      var oId=selObra?selObra.value:'';
+      var m=selMes?selMes.value:'';
+      if(!oId){alert('Selecione uma obra');return;}
+      if(!m){alert('Selecione um mês');return;}
+      var o2=findO(oId);
+      var lancs=S.lancamentos.filter(function(l){return l.obraId===oId&&l.mes===m;});
+      var tot=lancs.reduce(function(a,l){return a+Number(l.valor);},0);
+      var msg='Fechar '+mesLabel(m)+' — '+(o2?o2.nome:'')+'\n\n'+
+        lancs.length+' lançamentos · Total: '+fM(tot)+'\n\n'+
+        'Após o fechamento nenhum novo lançamento poderá ser feito neste período.';
+      if(!confirm(msg))return;
+      var f=fecharMes(m, oId);
       if(f){
-        alert('✅ Mês '+mesLabel(mes)+' fechado com sucesso!\nTotal geral: '+fM(f.totalGeral));
+        alert('✅ '+mesLabel(m)+' — '+(o2?o2.nome:'')+'\nFechado com sucesso!\nTotal: '+fM(f.totalGeral));
         rFechamentos();
         renderSidebarObras();
       }
     });
   }
+}
+
+// Soma total de gastos de um mês em todas as obras
+function gastosMesTotal(mes){
+  return S.lancamentos.filter(function(l){return l.mes===mes;}).reduce(function(a,l){return a+Number(l.valor);},0);
 }
 
 function rExcluidos(){
