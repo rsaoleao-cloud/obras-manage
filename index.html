@@ -1701,6 +1701,16 @@ function atualizarBarraSel(){
   }
 }
 
+// Adiciona N dias a uma data string YYYY-MM-DD
+function addDias(dataStr, dias){
+  var d=new Date(dataStr+'T12:00:00');
+  d.setDate(d.getDate()+dias);
+  var yr=d.getFullYear();
+  var mo=pad(d.getMonth()+1);
+  var dy=pad(d.getDate());
+  return {data:yr+'-'+mo+'-'+dy, mes:yr+'-'+mo};
+}
+
 function atualizarPreview(){
   var tipo=document.getElementById('l-pgto').value;
   var wrap=document.getElementById('l-parcelas-wrap');
@@ -2397,16 +2407,6 @@ function checkAlerta(obraId,mes){
     var txt='⚠ Obra: '+o.nome+'\n\n'+msgs.map(function(m){return m.txt;}).join('\n\n');
     alert(txt);
   }
-}
-
-// Adiciona N dias a uma data string YYYY-MM-DD e retorna nova data e mês
-function addDias(dataStr, dias){
-  var d=new Date(dataStr+'T12:00:00');
-  d.setDate(d.getDate()+dias);
-  var yr=d.getFullYear();
-  var mo=pad(d.getMonth()+1);
-  var dy=pad(d.getDate());
-  return {data:yr+'-'+mo+'-'+dy, mes:yr+'-'+mo};
 }
 
 function criarLancamentos(obraId,tipo,desc,resp,valor,data,pgto,nparcelas){
