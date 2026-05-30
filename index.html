@@ -1340,7 +1340,20 @@ function rObraDashboard(obraId){
     // Lançamentos do mês
     var rows=lancs.slice().sort(function(a,b){return b.data.localeCompare(a.data);}).map(function(l){
       var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':l.pgto==='30d'?'<span class="badge" style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc">📅 30 dias</span>':l.pgto==='cartao'?'<span class="badge" style="background:#faf5ff;color:#7c3aed;border:1px solid #ddd6fe">💳 Cartão</span>':l.pgto==='avista'?'<span style="font-size:10px;color:var(--text4)">💵 À vista</span>':'';
-      return'<tr><td style="white-space:nowrap">'+fD(l.data)+'</td><td>'+l.descricao+'</td><td>'+(l.resp||'—')+'</td><td>'+catBadge(l.tipo)+'</td><td>'+pb+'</td><td style="font-family:var(--mono);text-align:right">'+fM(l.valor)+'</td></tr>';
+      // Verifica se este lançamento foi incluído em algum fechamento
+      var noFechamento=S.fechamentos&&S.fechamentos.some(function(f){
+        return f.mes===l.mes&&(f.obraId===l.obraId||!f.obraId);
+      });
+      var fechBadge=noFechamento?'<span title="Incluído no fechamento de '+mesLabel(l.mes)+'" style="font-size:10px;background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:4px;padding:1px 6px;font-family:var(--mono)">🔒 Fechado</span>':'';
+      return'<tr style="'+(noFechamento?'opacity:.75;':'')+'">'+
+        '<td style="white-space:nowrap">'+fD(l.data)+'</td>'+
+        '<td>'+l.descricao+'</td>'+
+        '<td>'+(l.resp||'—')+'</td>'+
+        '<td>'+catBadge(l.tipo)+'</td>'+
+        '<td>'+pb+'</td>'+
+        '<td style="font-family:var(--mono);text-align:right">'+fM(l.valor)+'</td>'+
+        '<td>'+fechBadge+'</td>'+
+      '</tr>';
     }).join('');
 
     h+='<div class="fcard">'+
@@ -1351,10 +1364,8 @@ function rObraDashboard(obraId){
         '</div>'+
         '<div style="font-size:20px;font-weight:700;font-family:var(--mono);color:var(--accent)">'+fM(totMes)+'</div>'+
       '</div>'+
-      // Barras por categoria
       '<div style="margin-bottom:14px">'+catBars+'</div>'+
-      // Tabela de lançamentos
-      '<div class="tw"><table><thead><tr><th>Data</th><th>Descrição</th><th>Resp.</th><th>Tipo</th><th>Pgto</th><th style="text-align:right">Valor</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+      '<div class="tw"><table><thead><tr><th>Data</th><th>Descrição</th><th>Resp.</th><th>Tipo</th><th>Pgto</th><th style="text-align:right">Valor</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
     '</div>';
   });
 
@@ -2713,17 +2724,46 @@ function rFechamentos(){
     var m=selMes?selMes.value:'';
     var info=document.getElementById('fechar-mes-info');
     if(!info)return;
-    if(!oId||!m){info.textContent='';return;}
+    if(!oId||!m){info.innerHTML='';return;}
     var o2=findO(oId);
     var lancs=S.lancamentos.filter(function(l){return l.obraId===oId&&l.mes===m;});
     var tot=lancs.reduce(function(a,l){return a+Number(l.valor);},0);
-    if(lancs.length){
-      info.style.color='var(--text2)';
-      info.innerHTML='<strong>'+(o2?o2.nome:'')+'</strong> · '+mesLabel(m)+' · '+lancs.length+' lançamento'+(lancs.length!==1?'s':'')+' · Total: <strong>'+fM(tot)+'</strong>';
-    } else {
-      info.style.color='var(--text4)';
-      info.textContent='Sem lançamentos em '+mesLabel(m)+' para '+(o2?o2.nome:'esta obra');
+
+    if(!lancs.length){
+      info.innerHTML='<span style="color:var(--text4)">Sem lançamentos em '+mesLabel(m)+' para '+(o2?o2.nome:'esta obra')+'</span>';
+      return;
     }
+
+    // Resumo por categoria
+    var porCat={};
+    lancs.forEach(function(l){if(!porCat[l.tipo])porCat[l.tipo]=0;porCat[l.tipo]+=Number(l.valor);});
+    var catResumo=Object.keys(porCat).map(function(cat){
+      var c3=CATEGORIAS[cat]||CATEGORIAS.despesa;
+      return'<span class="badge" style="background:'+c3.bg+';color:'+c3.cor+';border:1px solid '+c3.border+'">'+c3.icon+' '+fM(porCat[cat])+'</span>';
+    }).join(' ');
+
+    // Lista de lançamentos
+    var lRows=lancs.slice().sort(function(a,b){return b.data.localeCompare(a.data);}).map(function(l){
+      var pb=l.parcela?l.parcela+'/'+l.total_parcelas+'x':l.pgto==='30d'?'📅 30d':l.pgto==='cartao'?'💳':l.pgto==='avista'?'À vista':'';
+      return'<tr>'+
+        '<td style="white-space:nowrap;font-size:12px">'+fD(l.data)+'</td>'+
+        '<td style="font-size:12px">'+l.descricao+'</td>'+
+        '<td style="font-size:12px">'+(l.resp||'—')+'</td>'+
+        '<td>'+catBadge(l.tipo)+'</td>'+
+        '<td style="font-size:10px;color:var(--text3)">'+pb+'</td>'+
+        '<td style="font-family:var(--mono);text-align:right;font-weight:600;font-size:12px">'+fM(l.valor)+'</td>'+
+      '</tr>';
+    }).join('');
+
+    info.innerHTML=
+      '<div style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">'+
+        '<div><strong style="color:var(--text)">'+(o2?o2.nome:'')+' · '+mesLabel(m)+'</strong> &nbsp;'+catResumo+'</div>'+
+        '<div style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--accent)">Total: '+fM(tot)+'</div>'+
+      '</div>'+
+      '<div class="tw" style="max-height:260px;overflow-y:auto">'+
+        '<table><thead><tr><th>Data</th><th>Descrição</th><th>Resp.</th><th>Tipo</th><th>Pgto</th><th style="text-align:right">Valor</th></tr></thead>'+
+        '<tbody>'+lRows+'</tbody>'+
+      '</table></div>';
   }
 
   if(selObra){
