@@ -1356,6 +1356,28 @@ function rObraDashboard(obraId){
       '</tr>';
     }).join('');
 
+    // Resumo por tipo no rodapé do mês
+    var resumoMesRows='';
+    ['despesa','almoco','hospedagem','combustivel','prestador','peca'].forEach(function(cat){
+      var arr2=lancs.filter(function(l){return l.tipo===cat;});
+      if(!arr2.length)return;
+      var tCat2=arr2.reduce(function(a,l){return a+Number(l.valor);},0);
+      var c4=CATEGORIAS[cat]||CATEGORIAS.despesa;
+      var pct2=((tCat2/totMes)*100).toFixed(1);
+      var bw=Math.round((tCat2/totMes)*100);
+      resumoMesRows+=
+        '<tr>'+
+          '<td><span class="badge" style="background:'+c4.bg+';color:'+c4.cor+';border:1px solid '+c4.border+'">'+c4.icon+' '+c4.label+'</span></td>'+
+          '<td><div style="display:flex;align-items:center;gap:8px">'+
+            '<div style="flex:1;height:5px;background:var(--bg3);border-radius:3px;overflow:hidden;min-width:80px">'+
+              '<div style="width:'+bw+'%;height:100%;background:'+c4.cor+';border-radius:3px"></div>'+
+            '</div>'+
+            '<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">'+pct2+'%</span>'+
+          '</div></td>'+
+          '<td style="font-family:var(--mono);text-align:right;font-weight:600;color:'+c4.cor+'">'+fM(tCat2)+'</td>'+
+        '</tr>';
+    });
+
     h+='<div class="fcard">'+
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
         '<div>'+
@@ -1366,6 +1388,17 @@ function rObraDashboard(obraId){
       '</div>'+
       '<div style="margin-bottom:14px">'+catBars+'</div>'+
       '<div class="tw"><table><thead><tr><th>Data</th><th>Descrição</th><th>Resp.</th><th>Tipo</th><th>Pgto</th><th style="text-align:right">Valor</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+      // Tabela totalizadora por tipo
+      '<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">'+
+        '<div class="section-hdr" style="margin-bottom:8px">Totalização por tipo de gasto</div>'+
+        '<table style="width:100%">'+
+          '<tbody>'+resumoMesRows+'</tbody>'+
+          '<tfoot><tr style="border-top:1px solid var(--border2)">'+
+            '<td colspan="2" style="font-weight:700;padding-top:6px;font-size:12px">TOTAL DO MÊS</td>'+
+            '<td style="font-family:var(--mono);text-align:right;font-weight:700;color:var(--accent);padding-top:6px">'+fM(totMes)+'</td>'+
+          '</tr></tfoot>'+
+        '</table>'+
+      '</div>'+
     '</div>';
   });
 
@@ -2119,7 +2152,54 @@ function renderRelatorioResultado(){
     if(!algum)h+='<div style="padding:18px;text-align:center;color:var(--text4);font-size:12px">Sem lançamentos em '+mesLabel(REL.mes)+'</div>';
   }
 
-  h+='<div class="rel-sub" style="background:var(--bg4);font-size:13px"><strong>TOTAL · '+mesLabel(REL.mes)+'</strong><strong style="font-family:var(--mono);color:var(--accent)">'+fM(tot)+'</strong></div></div></div>';
+  h+='<div class="rel-sub" style="background:var(--bg4);font-size:13px"><strong>TOTAL · '+mesLabel(REL.mes)+'</strong><strong style="font-family:var(--mono);color:var(--accent)">'+fM(tot)+'</strong></div>';
+
+  // ---- TABELA RESUMO POR TIPO ----
+  if(!REL.cat && lancs.length){
+    var cats2=['despesa','almoco','hospedagem','combustivel','prestador','peca'];
+    var resumoRows='';
+    var totVerif=0;
+    cats2.forEach(function(cat){
+      var arr=lancs.filter(function(l){return l.tipo===cat;});
+      if(!arr.length)return;
+      var tCat=arr.reduce(function(a,l){return a+Number(l.valor);},0);
+      totVerif+=tCat;
+      var c3=CATEGORIAS[cat]||CATEGORIAS.despesa;
+      var pct=((tCat/tot)*100).toFixed(1);
+      var barW=Math.round((tCat/tot)*100);
+      resumoRows+=
+        '<tr>'+
+          '<td>'+
+            '<span class="badge" style="background:'+c3.bg+';color:'+c3.cor+';border:1px solid '+c3.border+'">'+c3.icon+' '+c3.label+'</span>'+
+          '</td>'+
+          '<td>'+
+            '<div style="display:flex;align-items:center;gap:8px">'+
+              '<div style="flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;min-width:60px">'+
+                '<div style="width:'+barW+'%;height:100%;background:'+c3.cor+';border-radius:3px"></div>'+
+              '</div>'+
+              '<span style="font-size:11px;color:var(--text3);font-family:var(--mono);min-width:36px">'+pct+'%</span>'+
+            '</div>'+
+          '</td>'+
+          '<td style="font-family:var(--mono);text-align:right;font-weight:600;color:'+c3.cor+'">'+fM(tCat)+'</td>'+
+        '</tr>';
+    });
+    h+=
+      '</div></div>'+
+      '<div class="fcard" style="margin-top:14px">'+
+        '<div class="section-hdr" style="margin-bottom:12px">Resumo por tipo de gasto — '+mesLabel(REL.mes)+'</div>'+
+        '<table style="width:100%">'+
+          '<thead><tr><th>Tipo</th><th>Participação</th><th style="text-align:right">Total</th></tr></thead>'+
+          '<tbody>'+resumoRows+'</tbody>'+
+          '<tfoot><tr style="border-top:2px solid var(--border2)">'+
+            '<td colspan="2" style="font-weight:700;padding-top:8px">TOTAL GERAL</td>'+
+            '<td style="font-family:var(--mono);text-align:right;font-weight:700;font-size:15px;color:var(--accent);padding-top:8px">'+fM(tot)+'</td>'+
+          '</tr></tfoot>'+
+        '</table>'+
+      '</div>';
+  } else {
+    h+='</div></div>';
+  }
+
   h+='<div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:8px">'+lancs.length+' lançamento'+(lancs.length!==1?'s':'')+(REL.cat?' · '+catLabel(REL.cat):'')+'</div>';
   el.innerHTML=h;
 }
