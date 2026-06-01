@@ -1615,7 +1615,7 @@ function atualizarListaLancs(){
     var ob=findO(l.obraId);
     var tb=catBadge(l.tipo);
     var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':l.pgto==='30d'?'<span class="badge" style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc">📅 30 dias</span>':l.pgto==='cartao'?'<span class="badge" style="background:#faf5ff;color:#7c3aed;border:1px solid #ddd6fe">💳 Cartão</span>':l.pgto==='avista'?'<span style="font-size:10px;color:var(--text4)">💵 À vista</span>':'';
-    rows+='<tr class="lanc-row" data-id="'+l.id+'">'+
+    rows+='<tr class="lanc-row" data-id="'+l.id+'" title="Duplo clique para editar" style="cursor:pointer">'+
       '<td>'+fD(l.data)+'</td>'+
       (obraId?'':'<td>'+(ob?ob.nome:'—')+'</td>')+
       '<td>'+l.descricao+'</td>'+
@@ -1640,7 +1640,7 @@ function atualizarListaLancs(){
     (rec.length
       ? '<div class="tw"><div class="tw-hdr" style="display:flex;justify-content:space-between;align-items:center">'+
           '<span>'+tituloLista+'</span>'+
-          '<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">Segure para selecionar · Toque ✕ para excluir</span>'+
+          '<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">✏️ Duplo clique para editar &nbsp;·&nbsp; Segure para selecionar &nbsp;·&nbsp; ✕ para excluir</span>'+
         '</div>'+
         '<table><thead><tr>'+headerCols+'</tr></thead><tbody>'+rows+'</tbody></table></div>'
       : (obraId?'<div style="padding:20px;text-align:center;color:var(--text4);font-size:13px">Nenhum lançamento nesta obra</div>':''));
@@ -1652,6 +1652,29 @@ function atualizarListaLancs(){
       delLanc(this.dataset.id,null);
       atualizarListaLancs();
     });
+  });
+
+  // Duplo clique → editar (desktop)
+  document.querySelectorAll('#lanc-rec .lanc-row').forEach(function(row){
+    row.addEventListener('dblclick',function(e){
+      if(e.target.tagName==='BUTTON')return;
+      editarLanc(this.dataset.id, function(){ atualizarListaLancs(); });
+    });
+    // Long press → editar (mobile)
+    var _lpt=null;
+    row.addEventListener('touchstart',function(e){
+      if(e.target.tagName==='BUTTON')return;
+      var id=this.dataset.id;
+      _lpt=setTimeout(function(){
+        if(navigator.vibrate)navigator.vibrate(40);
+        editarLanc(id, function(){ atualizarListaLancs(); });
+      },600);
+    },{passive:true});
+    row.addEventListener('touchend',function(){clearTimeout(_lpt);});
+    row.addEventListener('touchmove',function(){clearTimeout(_lpt);});
+    // Highlight hover
+    row.addEventListener('mouseenter',function(){this.style.background='rgba(30,110,217,.05)';});
+    row.addEventListener('mouseleave',function(){if(!this.classList.contains('selecionado'))this.style.background='';});
   });
 
   bindLancSelection();
@@ -1866,7 +1889,7 @@ function filtrarHistorico(){
   });
 }
 
-function editarLanc(id){
+function editarLanc(id, onSave){
   var l = S.lancamentos.find(function(x){return x.id===id;});
   if(!l) return;
   var o = findO(l.obraId);
@@ -1944,7 +1967,8 @@ function editarLanc(id){
     sv();
     pushLanc(novo);
     closeModal();
-    filtrarHistorico();
+    if(typeof onSave==='function') onSave();
+    else filtrarHistorico();
     syncChip('sync','Salvando...');
   });
 }
@@ -2154,46 +2178,75 @@ function renderRelatorioResultado(){
 
   h+='<div class="rel-sub" style="background:var(--bg4);font-size:13px"><strong>TOTAL · '+mesLabel(REL.mes)+'</strong><strong style="font-family:var(--mono);color:var(--accent)">'+fM(tot)+'</strong></div>';
 
-  // ---- TABELA RESUMO POR TIPO ----
-  if(!REL.cat && lancs.length){
-    var cats2=['despesa','almoco','hospedagem','combustivel','prestador','peca'];
-    var resumoRows='';
-    var totVerif=0;
-    cats2.forEach(function(cat){
+  // ---- DISCRIMINAÇÃO COMPLETA POR TIPO (sempre exibida quando há lançamentos) ----
+  if(lancs.length){
+    var allCats=['despesa','almoco','hospedagem','combustivel','prestador','peca'];
+    var discRows='';
+    var totDisc=0;
+    allCats.forEach(function(cat){
       var arr=lancs.filter(function(l){return l.tipo===cat;});
       if(!arr.length)return;
       var tCat=arr.reduce(function(a,l){return a+Number(l.valor);},0);
-      totVerif+=tCat;
+      totDisc+=tCat;
       var c3=CATEGORIAS[cat]||CATEGORIAS.despesa;
       var pct=((tCat/tot)*100).toFixed(1);
       var barW=Math.round((tCat/tot)*100);
-      resumoRows+=
+      discRows+=
         '<tr>'+
-          '<td>'+
-            '<span class="badge" style="background:'+c3.bg+';color:'+c3.cor+';border:1px solid '+c3.border+'">'+c3.icon+' '+c3.label+'</span>'+
+          '<td style="padding:8px 12px">'+
+            '<span class="badge" style="background:'+c3.bg+';color:'+c3.cor+';border:1px solid '+c3.border+';font-size:12px;padding:4px 10px">'+c3.icon+' '+c3.label+'</span>'+
           '</td>'+
-          '<td>'+
+          '<td style="padding:8px 12px">'+arr.length+' lançamento'+(arr.length!==1?'s':'')+'</td>'+
+          '<td style="padding:8px 12px">'+
             '<div style="display:flex;align-items:center;gap:8px">'+
-              '<div style="flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;min-width:60px">'+
-                '<div style="width:'+barW+'%;height:100%;background:'+c3.cor+';border-radius:3px"></div>'+
+              '<div style="flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;min-width:80px">'+
+                '<div style="width:'+barW+'%;height:100%;background:'+c3.cor+';border-radius:4px"></div>'+
               '</div>'+
-              '<span style="font-size:11px;color:var(--text3);font-family:var(--mono);min-width:36px">'+pct+'%</span>'+
+              '<span style="font-size:11px;color:var(--text3);font-family:var(--mono);min-width:40px">'+pct+'%</span>'+
             '</div>'+
           '</td>'+
-          '<td style="font-family:var(--mono);text-align:right;font-weight:600;color:'+c3.cor+'">'+fM(tCat)+'</td>'+
+          '<td style="font-family:var(--mono);text-align:right;font-weight:700;color:'+c3.cor+';padding:8px 12px;font-size:14px">'+fM(tCat)+'</td>'+
         '</tr>';
     });
+
+    // Orçamento restante
+    var budgetRow='';
+    if(o.budget&&Number(o.budget)>0){
+      var restante=Number(o.budget)-tot;
+      var corRest=restante>=0?'#16a34a':'#dc2626';
+      var labelRest=restante>=0?'Saldo do budget':'Estouro do budget';
+      budgetRow=
+        '<tr style="border-top:1px solid var(--border2)">'+
+          '<td colspan="3" style="padding:8px 12px;color:var(--text3);font-size:12px">Budget mensal: '+fM(o.budget)+' · '+pp+'% utilizado</td>'+
+          '<td style="font-family:var(--mono);text-align:right;font-weight:600;color:'+corRest+';padding:8px 12px;font-size:13px">'+
+            '<span style="font-size:10px;display:block;color:var(--text3)">'+labelRest+'</span>'+
+            fM(Math.abs(restante))+
+          '</td>'+
+        '</tr>';
+    }
+
     h+=
       '</div></div>'+
-      '<div class="fcard" style="margin-top:14px">'+
-        '<div class="section-hdr" style="margin-bottom:12px">Resumo por tipo de gasto — '+mesLabel(REL.mes)+'</div>'+
-        '<table style="width:100%">'+
-          '<thead><tr><th>Tipo</th><th>Participação</th><th style="text-align:right">Total</th></tr></thead>'+
-          '<tbody>'+resumoRows+'</tbody>'+
-          '<tfoot><tr style="border-top:2px solid var(--border2)">'+
-            '<td colspan="2" style="font-weight:700;padding-top:8px">TOTAL GERAL</td>'+
-            '<td style="font-family:var(--mono);text-align:right;font-weight:700;font-size:15px;color:var(--accent);padding-top:8px">'+fM(tot)+'</td>'+
-          '</tr></tfoot>'+
+      '<div class="fcard" style="margin-top:14px;border:2px solid var(--border2)">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
+          '<div class="ftitle" style="margin:0">📊 Discriminação dos gastos — '+mesLabel(REL.mes)+'</div>'+
+          '<div style="font-size:11px;color:var(--text3);font-family:var(--mono)">'+o.nome+'</div>'+
+        '</div>'+
+        '<table style="width:100%;border-collapse:collapse">'+
+          '<thead><tr style="background:var(--bg3)">'+
+            '<th style="padding:8px 12px;text-align:left;font-size:11px">Tipo de gasto</th>'+
+            '<th style="padding:8px 12px;text-align:left;font-size:11px">Qtd</th>'+
+            '<th style="padding:8px 12px;text-align:left;font-size:11px">Participação</th>'+
+            '<th style="padding:8px 12px;text-align:right;font-size:11px">Valor</th>'+
+          '</tr></thead>'+
+          '<tbody>'+discRows+'</tbody>'+
+          '<tfoot>'+
+            budgetRow+
+            '<tr style="background:var(--accent);color:#fff">'+
+              '<td colspan="3" style="padding:10px 12px;font-weight:700;font-size:14px;font-family:var(--serif)">TOTAL GERAL DO MÊS</td>'+
+              '<td style="font-family:var(--mono);text-align:right;font-weight:900;font-size:18px;padding:10px 12px">'+fM(tot)+'</td>'+
+            '</tr>'+
+          '</tfoot>'+
         '</table>'+
       '</div>';
   } else {
