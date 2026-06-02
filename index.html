@@ -201,6 +201,9 @@ select.fi option{background:var(--bg2);color:var(--text)}
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--bg2)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 .divider{height:1px;background:var(--border);margin:16px 0}
 .section-hdr{font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;font-weight:600}
+/* OFFLINE */
+.offline-bar{display:none;position:fixed;top:var(--header);left:0;right:0;z-index:150;background:#f59e0b;color:#fff;font-size:12px;font-family:var(--mono);text-align:center;padding:6px;font-weight:600}
+.offline-bar.visible{display:block}
 
 /* LONG PRESS / SELEÇÃO DE LANÇAMENTOS */
 .lanc-row{cursor:pointer;transition:background .15s;-webkit-user-select:none;user-select:none}
@@ -422,16 +425,19 @@ select.fi option{background:var(--bg2);color:var(--text)}
       <div class="summary-bar" id="dash-summary"></div>
       <div id="dash-alerts"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:22px">
-        <!-- Gastos por categoria -->
         <div class="fcard">
           <div class="section-hdr" style="margin-bottom:12px">📊 Gastos por categoria — <span id="dash-cat-mes"></span></div>
-          <div id="dash-cat-chart"><div style="color:var(--text4);font-size:12px;text-align:center;padding:20px 0">Sem lançamentos neste mês</div></div>
+          <div id="dash-cat-chart"></div>
         </div>
-        <!-- Margem de lucro por obra -->
         <div class="fcard">
           <div class="section-hdr" style="margin-bottom:12px">💰 Margem de lucro por obra</div>
-          <div id="dash-margin-chart"><div style="color:var(--text4);font-size:12px;text-align:center;padding:20px 0">Configure contrato e custo previsto nas obras</div></div>
+          <div id="dash-margin-chart"></div>
         </div>
+      </div>
+      <!-- GRÁFICO EVOLUÇÃO MENSAL -->
+      <div class="fcard" style="margin-bottom:22px">
+        <div class="section-hdr" style="margin-bottom:14px">📈 Evolução de gastos — últimos 6 meses</div>
+        <div id="dash-evolucao-chart"></div>
       </div>
       <div class="section-hdr">Próximos 3 meses — Gastos comprometidos</div>
       <div class="month-timeline" id="dash-timeline"></div>
@@ -493,6 +499,29 @@ select.fi option{background:var(--bg2);color:var(--text)}
           </div>
         </div>
         <div id="l-preview"></div>
+        <!-- RECORRENTE -->
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg3);border-radius:var(--rsm);margin-bottom:4px">
+          <input type="checkbox" id="l-recorrente" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer">
+          <label for="l-recorrente" style="cursor:pointer;font-size:13px;color:var(--text2)">
+            🔁 <strong>Lançamento recorrente</strong>
+            <span style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-left:6px">— repetir automaticamente nos próximos meses</span>
+          </label>
+        </div>
+        <div id="l-recorrente-wrap" style="display:none;padding:10px 12px;background:var(--bg3);border-radius:var(--rsm);border:1px solid var(--border2)">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <div><label class="flbl" style="display:block;margin-bottom:4px">Repetir por</label>
+              <select class="fi" id="l-recorrente-meses" style="width:150px">
+                <option value="2">2 meses</option>
+                <option value="3">3 meses</option>
+                <option value="6" selected>6 meses</option>
+                <option value="12">12 meses</option>
+              </select>
+            </div>
+            <div style="font-size:11px;color:var(--text3);font-family:var(--mono);max-width:260px;line-height:1.5">
+              Cria lançamentos idênticos nos próximos meses selecionados, mantendo o dia do mês.
+            </div>
+          </div>
+        </div>
         <div class="factions"><button class="btn btn-primary" id="btn-salvar-lanc">✅ Registrar Gasto</button></div>
       </div>
       <div style="margin-top:22px" id="lanc-rec"></div>
@@ -578,6 +607,9 @@ select.fi option{background:var(--bg2);color:var(--text)}
 </div>
 
 <div id="modal" class="mo hidden"><div class="mbox" id="mbox"></div></div>
+
+<!-- BARRA OFFLINE -->
+<div id="offline-bar" class="offline-bar">⚠ Sem conexão — lançamentos salvos localmente e serão sincronizados quando a conexão voltar</div>
 
 <!-- BARRA DE SELEÇÃO DE LANÇAMENTOS -->
 <div id="lanc-sel-bar" class="lanc-sel-bar">
@@ -1153,7 +1185,79 @@ function rDashboard(){
     }
   }
 
-  // Obras resumo
+  // ---- GRÁFICO EVOLUÇÃO MENSAL ----
+  var evolDiv=document.getElementById('dash-evolucao-chart');
+  if(evolDiv){
+    var ultMeses=[];
+    for(var i=5;i>=0;i--){
+      var d2=new Date(); d2.setMonth(d2.getMonth()-i);
+      ultMeses.push(d2.getFullYear()+'-'+pad(d2.getMonth()+1));
+    }
+    // Valor máximo para escala
+    var maxVal=0;
+    var seriesPorObra=S.obras.map(function(o){
+      var vals=ultMeses.map(function(m){
+        var t=S.lancamentos.filter(function(l){return l.obraId===o.id&&l.mes===m;}).reduce(function(a,l){return a+Number(l.valor);},0);
+        if(t>maxVal)maxVal=t;
+        return t;
+      });
+      return {obra:o,vals:vals};
+    });
+    // Total por mês (linha)
+    var totaisMes=ultMeses.map(function(m){
+      return S.lancamentos.filter(function(l){return l.mes===m;}).reduce(function(a,l){return a+Number(l.valor);},0);
+    });
+    totaisMes.forEach(function(t){if(t>maxVal)maxVal=t;});
+
+    if(maxVal===0){
+      evolDiv.innerHTML='<div style="color:var(--text4);font-size:12px;text-align:center;padding:20px 0">Sem dados nos últimos 6 meses</div>';
+    } else {
+      var barColors=['#1e90ff','#16a34a','#f59e0b','#8b5cf6','#ef4444','#06b6d4'];
+      var chartH=140;
+      var barW=Math.floor(100/ultMeses.length);
+
+      var html='<div style="display:flex;gap:0;align-items:flex-end;height:'+chartH+'px;border-bottom:2px solid var(--border);padding-bottom:4px;margin-bottom:8px">';
+      ultMeses.forEach(function(m,mi){
+        var tot=totaisMes[mi];
+        var h2=tot>0?Math.max(4,Math.round((tot/maxVal)*(chartH-20))):0;
+        html+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">'+
+          (tot>0?'<div style="font-size:9px;font-family:var(--mono);color:var(--text3)">'+fM(tot)+'</div>':'<div style="font-size:9px">&nbsp;</div>')+
+          '<div style="width:80%;height:'+h2+'px;background:var(--accent);border-radius:3px 3px 0 0;opacity:0.85;transition:height .5s;cursor:default" title="'+mesLabel(m)+': '+fM(tot)+'"></div>'+
+        '</div>';
+      });
+      html+='</div>';
+      // Labels meses
+      html+='<div style="display:flex;gap:0;margin-bottom:12px">';
+      ultMeses.forEach(function(m,mi){
+        var parts=m.split('-');
+        var mn=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+        var lbl=mn[parseInt(parts[1])-1]+'/'+parts[0].slice(2);
+        html+='<div style="flex:1;text-align:center;font-size:10px;font-family:var(--mono);color:'+(m===mes?'var(--accent)':'var(--text3)')+';font-weight:'+(m===mes?'700':'400')+'">'+lbl+'</div>';
+      });
+      html+='</div>';
+      // Por obra (mini barras empilhadas)
+      if(S.obras.length>1){
+        html+='<div style="display:flex;flex-direction:column;gap:6px">';
+        seriesPorObra.forEach(function(s,si){
+          html+='<div style="display:flex;align-items:center;gap:8px">'+
+            '<div style="width:110px;font-size:11px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0">'+
+              '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+barColors[si%barColors.length]+';margin-right:5px"></span>'+
+              s.obra.nome+
+            '</div>'+
+            '<div style="flex:1;display:flex;gap:1px">';
+          s.vals.forEach(function(v,vi){
+            var w=maxVal>0?Math.max(0,Math.round((v/maxVal)*100)):0;
+            html+='<div style="flex:1;height:6px;background:var(--bg3);border-radius:2px;overflow:hidden">'+
+              (w>0?'<div style="width:'+w+'%;height:100%;background:'+barColors[si%barColors.length]+';opacity:0.7;border-radius:2px"></div>':'')+
+            '</div>';
+          });
+          html+='</div></div>';
+        });
+        html+='</div>';
+      }
+      evolDiv.innerHTML=html;
+    }
+  }
   if(S.obras.length===0){
     document.getElementById('dash-obras-lbl').textContent='';
     document.getElementById('dash-obras').innerHTML='<div class="empty"><div class="empty-icon">🏗️</div><div class="empty-text">Nenhuma obra cadastrada.<br>Clique em <strong>+ Nova Obra</strong> para começar.</div></div>';
@@ -1180,6 +1284,11 @@ function rDashboard(){
         '<div class="prog-lbl"><span>Budget utilizado</span><span style="color:'+cor+'">'+p.toFixed(0)+'%</span></div>'+
         '<div class="prog-bar"><div class="prog-fill '+cls+'" style="width:'+Math.min(p,100)+'%"></div></div>'+
       '</div>'+
+      (o.avanco&&Number(o.avanco)>0?
+        '<div class="prog-wrap" style="margin-top:6px">'+
+          '<div class="prog-lbl"><span>Avanço físico</span><span style="color:'+(Number(o.avanco)>=100?'#16a34a':Number(o.avanco)>=70?'#1e90ff':'#f59e0b')+'">'+Number(o.avanco).toFixed(0)+'%</span></div>'+
+          '<div class="prog-bar"><div class="prog-fill" style="width:'+Math.min(100,Number(o.avanco))+'%;background:'+(Number(o.avanco)>=100?'#16a34a':Number(o.avanco)>=70?'#1e90ff':'#f59e0b')+'"></div></div>'+
+        '</div>':'')+
     '</div>';
   });
   oh+='</div>';
@@ -1563,7 +1672,7 @@ function rLancamentos(){
   document.getElementById('l-data').value=hoje();
   atualizarPreview();
   bindAllMoney();
-  // Atualiza lista ao trocar obra
+  bindRecorrente();
   selEl.onchange=function(){ atualizarListaLancs(); };
   atualizarListaLancs();
 }
@@ -1681,8 +1790,132 @@ function atualizarListaLancs(){
 }
 
 // ============================================================
-// SELEÇÃO DE LANÇAMENTOS — Long press (mobile) + click (desktop)
+// MODO OFFLINE — fila de sincronização
 // ============================================================
+var OFFLINE_QUEUE_KEY = 'obras_offline_queue';
+var _isOnline = navigator.onLine;
+
+function getOfflineQueue(){
+  try{ var d=localStorage.getItem(OFFLINE_QUEUE_KEY); return d?JSON.parse(d):[]; }catch(e){return [];}
+}
+function saveOfflineQueue(q){ try{localStorage.setItem(OFFLINE_QUEUE_KEY,JSON.stringify(q));}catch(e){} }
+function addToOfflineQueue(type, data){
+  var q=getOfflineQueue();
+  q.push({type:type, data:data, ts:Date.now()});
+  saveOfflineQueue(q);
+}
+
+function syncOfflineQueue(){
+  if(!FB||!_isOnline) return;
+  var q=getOfflineQueue();
+  if(!q.length) return;
+  var promises=q.map(function(item){
+    if(item.type==='obra') return FB.collection('obras').doc(item.data.id).set(item.data);
+    if(item.type==='lanc') return FB.collection('lancamentos').doc(item.data.id).set(item.data);
+    if(item.type==='excl') return FB.collection('excluidos').doc(item.data.id).set(item.data);
+    return Promise.resolve();
+  });
+  Promise.all(promises).then(function(){
+    saveOfflineQueue([]);
+    syncChip('ok','Sincronizado — '+q.length+' item(s) offline');
+    console.log('Offline queue synced:', q.length, 'items');
+  }).catch(function(e){
+    console.warn('Sync queue error:', e);
+  });
+}
+
+window.addEventListener('online', function(){
+  _isOnline=true;
+  document.getElementById('offline-bar').classList.remove('visible');
+  syncChip('sync','Reconectado — sincronizando...');
+  syncOfflineQueue();
+  setTimeout(function(){syncFromCloud(function(){renderPage(S.pagina);});}, 500);
+});
+window.addEventListener('offline', function(){
+  _isOnline=false;
+  document.getElementById('offline-bar').classList.add('visible');
+  syncChip('local','Offline — dados salvos localmente');
+});
+if(!navigator.onLine){
+  document.getElementById('offline-bar').classList.add('visible');
+}
+
+// Override pushLanc e pushObra para usar fila quando offline
+var _origPushLanc=pushLanc;
+pushLanc=function(l){
+  if(_isOnline && FB){ _origPushLanc(l); }
+  else { sv(); addToOfflineQueue('lanc',l); }
+};
+var _origPushObra=pushObra;
+pushObra=function(o){
+  if(_isOnline && FB){ _origPushObra(o); }
+  else { sv(); addToOfflineQueue('obra',o); }
+};
+
+// ============================================================
+// LANÇAMENTO RECORRENTE
+// ============================================================
+function bindRecorrente(){
+  var chk=document.getElementById('l-recorrente');
+  var wrap=document.getElementById('l-recorrente-wrap');
+  if(chk&&wrap){
+    chk.addEventListener('change',function(){
+      wrap.style.display=this.checked?'block':'none';
+    });
+  }
+}
+
+function criarLancamentosRecorrentes(obraId,tipo,desc,resp,valor,data,pgto,meses){
+  var dp=data.split('-');
+  var yr=parseInt(dp[0]); var mo=parseInt(dp[1]); var dy=dp[2];
+  for(var i=1;i<=meses;i++){
+    var novoMo=mo+i; var novoYr=yr;
+    while(novoMo>12){novoMo-=12;novoYr++;}
+    var novaData=novoYr+'-'+pad(novoMo)+'-'+dy;
+    var novoMes=novoYr+'-'+pad(novoMo);
+    if(mesFechado(novoMes)) continue; // pula meses fechados
+    var l={
+      id:'l'+Date.now()+i+'r',
+      obraId:obraId, tipo:tipo, pgto:pgto,
+      descricao:desc+' (recorrente)',
+      resp:resp||'', valor:Number(valor),
+      data:novaData, mes:novoMes,
+      parcela:0, total_parcelas:0, recorrente:true
+    };
+    S.lancamentos.push(l);
+    pushLanc(l);
+  }
+}
+
+// ============================================================
+// EXPORTAR PDF
+// ============================================================
+function exportarPDF(){
+  // Abre janela de impressão com estilo otimizado
+  window.print();
+}
+
+function addCSS(css){
+  var s=document.createElement('style');
+  s.textContent=css;
+  document.head.appendChild(s);
+}
+
+// CSS de impressão
+addCSS('@media print{'+
+  '.sidebar,.header,.mobile-nav,.fab,.offline-bar,.lanc-sel-bar,#btn-sync,#btn-instalar-app,'+
+  '.btn-toggle-sidebar,.hdr-right,.factions,#lanc-rec,.tw-hdr button{display:none!important}'+
+  '.main{padding:0!important;margin:0!important;overflow:visible!important}'+
+  '.app{display:block!important;height:auto!important;overflow:visible!important}'+
+  '.page.active{display:block!important;overflow:visible!important}'+
+  'body{background:#fff!important;color:#000!important;font-size:12px!important}'+
+  '.fcard,.rel-os{border:1px solid #ccc!important;break-inside:avoid;background:#fff!important}'+
+  'table{width:100%!important;font-size:11px!important}'+
+  '.rel-sub{background:#f0f0f0!important;color:#000!important}'+
+  '@page{margin:1.5cm}'+
+'}');
+
+
 var _lancSelecionados = {};
 var _longPressTimer = null;
 var _selModo = false;
@@ -2086,7 +2319,7 @@ function renderRelatorioFiltros(){
 
   // Eventos filtros
   document.getElementById('rel-voltar').addEventListener('click', function(){ renderRelatorioObras(); });
-  document.getElementById('rel-imprimir').addEventListener('click', function(){ window.print(); });
+  document.getElementById('rel-imprimir').addEventListener('click', function(){ exportarPDF(); });
   document.getElementById('rel-filtrar').addEventListener('click', function(){
     REL.mes   = document.getElementById('rel-sel-mes').value;
     REL.cat   = document.getElementById('rel-sel-cat').value;
@@ -2322,6 +2555,7 @@ function modalObra(id){
       '<div class="fg"><label class="flbl">🧑‍🔧 Prestador (R$)</label><input class="fi" id="m-b-prestador" type="number" step="0.01" min="0" value="'+(o&&o.b_prestador?o.b_prestador:'')+'" placeholder="Sem limite"></div>'+
     '</div>'+
     '<div class="fg"><label class="flbl">Contrato Fechado (R$) — Valor vendido ao cliente</label><input class="fi" id="m-contrato" type="number" step="0.01" min="0" value="'+(o&&o.contrato?o.contrato:'')+'" placeholder="0,00"></div>'+
+    '<div class="fg"><label class="flbl">Avanço físico atual (%)</label><div style="display:flex;align-items:center;gap:10px"><input class="fi" id="m-avanco" type="number" min="0" max="100" step="1" value="'+(o&&o.avanco?o.avanco:'0')+'" placeholder="0" style="width:100px"><input type="range" id="m-avanco-range" min="0" max="100" step="1" value="'+(o&&o.avanco?o.avanco:'0')+'" style="flex:1;accent-color:var(--accent)"></div></div>'+
     '<div class="mactions">'+
       (o?'<button class="btn btn-danger" id="m-del">🗑 Excluir</button>':'')+
       '<button class="btn" id="m-cancel">Cancelar</button>'+
@@ -2330,6 +2564,13 @@ function modalObra(id){
   );
   document.getElementById('m-cancel').addEventListener('click',closeModal);
   document.getElementById('m-save').addEventListener('click',function(){saveObra(id);});
+  // Sync avanco slider ↔ input
+  var mAvanco=document.getElementById('m-avanco');
+  var mAvancoR=document.getElementById('m-avanco-range');
+  if(mAvanco&&mAvancoR){
+    mAvancoR.addEventListener('input',function(){mAvanco.value=this.value;});
+    mAvanco.addEventListener('input',function(){mAvancoR.value=this.value;});
+  }
   if(o){document.getElementById('m-del').addEventListener('click',function(){delObra(id);});}
   document.getElementById('m-nome').focus();
 
@@ -2418,9 +2659,10 @@ function saveObra(id){
   var bHosp=document.getElementById('m-b-hospedagem').value;
   var bComb=document.getElementById('m-b-combustivel').value;
   var bPrest=document.getElementById('m-b-prestador').value;
+  var avanco=document.getElementById('m-avanco')?document.getElementById('m-avanco').value||'0':'0';
   if(!nome){alert('Informe o nome da obra');return;}
   if(!budget||Number(budget)<=0){alert('Informe um budget válido');return;}
-  var dados={nome:nome,budget:budget,prazo:prazo||'',inicio:inicio||'',status:status,custo_previsto:custo||'',contrato:contrato||'',b_almoco:bAlmoco||'',b_hospedagem:bHosp||'',b_combustivel:bComb||'',b_prestador:bPrest||''};
+  var dados={nome:nome,budget:budget,prazo:prazo||'',inicio:inicio||'',status:status,custo_previsto:custo||'',contrato:contrato||'',b_almoco:bAlmoco||'',b_hospedagem:bHosp||'',b_combustivel:bComb||'',b_prestador:bPrest||'',avanco:avanco||'0'};
   if(id){
     var o=findO(id);
     Object.assign(o,dados);
@@ -2609,6 +2851,14 @@ function saveLanc(){
   if(!obraId){alert('Selecione uma obra');return;}
   if(!desc||!valor||valor<=0){alert('Preencha descrição e valor');return;}
   criarLancamentos(obraId,tipo,desc,resp,valor,data,pgto,np);
+  // Lançamento recorrente
+  var recChk=document.getElementById('l-recorrente');
+  if(recChk&&recChk.checked){
+    var nMeses=parseInt(document.getElementById('l-recorrente-meses').value)||6;
+    criarLancamentosRecorrentes(obraId,tipo,desc,resp,valor,data,pgto,nMeses);
+    recChk.checked=false;
+    document.getElementById('l-recorrente-wrap').style.display='none';
+  }
   sv();
   document.getElementById('l-desc').value='';document.getElementById('l-resp').value='';
   document.getElementById('l-valor').value='';document.getElementById('l-data').value=hoje();
