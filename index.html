@@ -540,11 +540,15 @@ select.fi option{background:var(--bg2);color:var(--text)}
           <button class="btn" id="btn-limpar-hist">✕</button>
         </div>
         <!-- Filtros avançados -->
-        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:10px">
           <div><label class="flbl" style="display:block">Obra</label><select class="fi" id="h-obra" style="width:185px"></select></div>
           <div><label class="flbl" style="display:block">Categoria</label><select class="fi" id="h-tipo" style="width:155px"><option value="">Todas</option><option value="despesa">💼 Despesa</option><option value="almoco">🍽 Almoço</option><option value="hospedagem">🏨 Hospedagem</option><option value="combustivel">⛽ Combustível</option><option value="prestador">🧑‍🔧 Prestador</option><option value="peca">🔩 Peça</option></select></div>
           <div><label class="flbl" style="display:block">De</label><input class="fi" id="h-de" type="date" style="width:140px"></div>
           <div><label class="flbl" style="display:block">Até</label><input class="fi" id="h-ate" type="date" style="width:140px"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;flex-wrap:wrap;gap:8px">
+          <div style="font-size:11px;color:var(--text3);font-family:var(--mono)" id="hist-contador"></div>
+          <button class="btn no-print" onclick="exportarPDF()">🖨 Imprimir</button>
         </div>
       </div>
       <div id="hist-body"></div>
@@ -1395,6 +1399,7 @@ function rObraDashboard(obraId){
         (contrato?'<span>Contrato: '+fM(contrato)+'</span>':'')+
       '</div>'+
     '</div>'+
+    '<button class="btn" onclick="exportarPDF()">🖨 Imprimir</button>'+
     '<button class="btn btn-primary" onclick="modalObra(\''+o.id+'\')">✏️ Editar</button>'+
   '</div>';
 
@@ -1903,16 +1908,35 @@ function addCSS(css){
 
 // CSS de impressão
 addCSS('@media print{'+
-  '.sidebar,.header,.mobile-nav,.fab,.offline-bar,.lanc-sel-bar,#btn-sync,#btn-instalar-app,'+
-  '.btn-toggle-sidebar,.hdr-right,.factions,#lanc-rec,.tw-hdr button{display:none!important}'+
+  // Oculta elementos de navegação e controle
+  '.sidebar,.header,.mobile-nav,.fab,.offline-bar,.lanc-sel-bar,'+
+  '#btn-sync,#btn-instalar-app,.btn-toggle-sidebar,.hdr-right,'+
+  '.factions,.no-print,#lanc-rec,.tw-hdr button,'+
+  '#obra-dash-voltar,.mactions,#rel-voltar,#rel-imprimir,'+
+  '[id^="btn-"],[data-act]{display:none!important}'+
+  // Layout
   '.main{padding:0!important;margin:0!important;overflow:visible!important}'+
   '.app{display:block!important;height:auto!important;overflow:visible!important}'+
-  '.page.active{display:block!important;overflow:visible!important}'+
-  'body{background:#fff!important;color:#000!important;font-size:12px!important}'+
-  '.fcard,.rel-os{border:1px solid #ccc!important;break-inside:avoid;background:#fff!important}'+
-  'table{width:100%!important;font-size:11px!important}'+
-  '.rel-sub{background:#f0f0f0!important;color:#000!important}'+
-  '@page{margin:1.5cm}'+
+  '.page{display:none!important;overflow:visible!important}'+
+  '.page.active{display:block!important}'+
+  // Cores para impressão
+  'body{background:#fff!important;color:#000!important;font-size:11px!important}'+
+  '.fcard,.rel-os{border:1px solid #ccc!important;break-inside:avoid;background:#fff!important;margin-bottom:8px!important}'+
+  // Tabelas
+  'table{width:100%!important;font-size:10px!important;border-collapse:collapse!important}'+
+  'th,td{border:1px solid #ddd!important;padding:4px 6px!important}'+
+  'thead{background:#f5f5f5!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
+  '.tw{overflow:visible!important;max-height:none!important}'+
+  // Cabeçalho de impressão
+  '.rel-sub,.rel-gt{background:#f0f0f0!important;color:#000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
+  // Barras de progresso
+  '.prog-bar,.prog-fill,.margin-gauge,.margin-gauge-fill,.chart-bar-fill{-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
+  // Badges
+  '.badge{border:1px solid #ccc!important;background:#f5f5f5!important;color:#333!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
+  // Título da página
+  '@page{margin:1.5cm;size:A4}'+
+  // Evita quebra de página dentro de cards
+  '.fcard,tr{break-inside:avoid}'+
 '}');
 
 
@@ -2103,7 +2127,8 @@ function filtrarHistorico(){
       '<tbody>'+rows+'</tbody></table>'+
     '</div>';
 
-  // Botões editar e excluir
+  var contEl=document.getElementById('hist-contador');
+  if(contEl) contEl.textContent=lancs.length+' lançamento'+(lancs.length!==1?'s':'')+' · Total: '+fM(total)+(busca?' · busca: "'+busca+'"':'');
   document.querySelectorAll('#hist-body [data-act="edit"]').forEach(function(btn){
     btn.addEventListener('click', function(){
       editarLanc(this.dataset.id);
@@ -2985,7 +3010,10 @@ function rFechamentos(){
 
   var painelFechar=
     '<div class="fcard" style="margin-bottom:18px;border-color:rgba(30,110,217,.3)">'+
-      '<div class="ftitle" style="margin-bottom:14px">🔒 Fechar período</div>'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
+        '<div class="ftitle" style="margin:0">🔒 Fechar período</div>'+
+        '<button class="btn no-print" onclick="exportarPDF()">🖨 Imprimir</button>'+
+      '</div>'+
       '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">'+
         '<div style="flex:1;min-width:180px">'+
           '<label class="flbl" style="display:block;margin-bottom:6px">① Obra</label>'+
@@ -3041,7 +3069,13 @@ function rFechamentos(){
     }).join('');
   }
 
-  c.innerHTML=painelFechar+(lista.length?'<div class="section-hdr" style="margin-bottom:12px">Histórico de fechamentos</div>':'')+rows;
+  c.innerHTML=painelFechar+
+    (lista.length?
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
+        '<div class="section-hdr" style="margin:0">Histórico de fechamentos</div>'+
+        '<button class="btn no-print" onclick="exportarPDF()">🖨 Imprimir histórico</button>'+
+      '</div>':'')+
+    rows;
 
   var selObra=document.getElementById('sel-obra-fechar');
   var selMes=document.getElementById('sel-mes-fechar');
