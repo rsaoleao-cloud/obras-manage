@@ -1338,7 +1338,7 @@ function rDashboard(){
   dashLancsLbl.textContent='Lançamentos recentes — duplo clique para excluir';
   var lRows=recLancs.map(function(l){
     var o2=findO(l.obraId);
-    var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':l.pgto==='30d'?'<span class="badge" style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc">📅 30 dias</span>':l.pgto==='cartao'?'<span class="badge" style="background:#faf5ff;color:#7c3aed;border:1px solid #ddd6fe">💳 Cartão</span>':l.pgto==='avista'?'<span style="font-size:10px;color:var(--text4)">💵 À vista</span>':'';
+    var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+' de '+l.total_parcelas+'</span>':l.pgto==='30d'?'<span class="badge" style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc">📅 30 dias</span>':l.pgto==='cartao'?'<span class="badge" style="background:#faf5ff;color:#7c3aed;border:1px solid #ddd6fe">💳 Cartão</span>':l.pgto==='avista'?'<span style="font-size:10px;color:var(--text4)">💵 À vista</span>':'';
     return'<tr class="dash-lanc-row" data-id="'+l.id+'" title="Duplo clique para excluir" style="-webkit-user-select:none;user-select:none;cursor:pointer">'+
       '<td>'+fD(l.data)+'</td>'+
       '<td>'+(o2?o2.nome:'—')+'</td>'+
@@ -1478,7 +1478,7 @@ function rObraDashboard(obraId){
 
     // Lançamentos do mês
     var rows=lancs.slice().sort(function(a,b){return b.data.localeCompare(a.data);}).map(function(l){
-      var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':l.pgto==='30d'?'<span class="badge" style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc">📅 30 dias</span>':l.pgto==='cartao'?'<span class="badge" style="background:#faf5ff;color:#7c3aed;border:1px solid #ddd6fe">💳 Cartão</span>':l.pgto==='avista'?'<span style="font-size:10px;color:var(--text4)">💵 À vista</span>':'';
+      var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+' de '+l.total_parcelas+'</span>':l.pgto==='30d'?'<span class="badge" style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc">📅 30 dias</span>':l.pgto==='cartao'?'<span class="badge" style="background:#faf5ff;color:#7c3aed;border:1px solid #ddd6fe">💳 Cartão</span>':l.pgto==='avista'?'<span style="font-size:10px;color:var(--text4)">💵 À vista</span>':'';
       // Verifica se este lançamento foi incluído em algum fechamento
       var noFechamento=S.fechamentos&&S.fechamentos.some(function(f){
         return f.mes===l.mes&&(f.obraId===l.obraId||!f.obraId);
@@ -1631,7 +1631,7 @@ function rDetalhe(obraId){
   else{
     todosLancs.forEach(function(l){
       var tipoBadge=catBadge(l.tipo);
-      var pgBadge=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':'<span style="font-size:10px;color:var(--text4)">À vista</span>';
+      var pgBadge=l.parcela?'<span class="badge b-parcela">'+l.parcela+' de '+l.total_parcelas+'</span>':'<span style="font-size:10px;color:var(--text4)">À vista</span>';
       rows+='<tr><td>'+fD(l.data)+'</td><td>'+l.descricao+'</td><td>'+(l.resp||'—')+'</td><td>'+tipoBadge+'</td><td>'+pgBadge+'</td><td style="font-family:var(--mono);text-align:right">'+fM(l.valor)+'</td><td><button class="btn btn-danger" style="font-size:10px;padding:3px 8px" data-id="'+l.id+'">✕</button></td></tr>';
     });
   }
@@ -1755,7 +1755,7 @@ function atualizarListaLancs(){
   rec.forEach(function(l){
     var ob=findO(l.obraId);
     var tb=catBadge(l.tipo);
-    var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':l.pgto==='30d'?'<span class="badge" style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc">📅 30 dias</span>':l.pgto==='cartao'?'<span class="badge" style="background:#faf5ff;color:#7c3aed;border:1px solid #ddd6fe">💳 Cartão</span>':l.pgto==='avista'?'<span style="font-size:10px;color:var(--text4)">💵 À vista</span>':'';
+    var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+' de '+l.total_parcelas+'</span>':l.pgto==='30d'?'<span class="badge" style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc">📅 30 dias</span>':l.pgto==='cartao'?'<span class="badge" style="background:#faf5ff;color:#7c3aed;border:1px solid #ddd6fe">💳 Cartão</span>':l.pgto==='avista'?'<span style="font-size:10px;color:var(--text4)">💵 À vista</span>':'';
     rows+='<tr class="lanc-row" data-id="'+l.id+'" title="Duplo clique para editar" style="cursor:pointer">'+
       '<td>'+fD(l.data)+'</td>'+
       (obraId?'':'<td>'+(ob?ob.nome:'—')+'</td>')+
@@ -2122,7 +2122,7 @@ function filtrarHistorico(){
   lancs.forEach(function(l){
     var o   = findO(l.obraId);
     var tb  = catBadge(l.tipo);
-    var pb  = l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':'<span style="font-size:10px;color:var(--text4)">À vista</span>';
+    var pb  = l.parcela?'<span class="badge b-parcela">'+l.parcela+' de '+l.total_parcelas+'</span>':'<span style="font-size:10px;color:var(--text4)">À vista</span>';
     // Destaca o termo buscado
     var desc = l.descricao;
     if(busca) desc = desc.replace(new RegExp('('+busca.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<mark style="background:#fef08a;border-radius:2px;padding:0 2px">$1</mark>');
@@ -2410,7 +2410,7 @@ function renderRelatorioResultado(){
 
   var makeRows = function(arr){
     return arr.slice().sort(function(a,b){return b.data.localeCompare(a.data);}).map(function(l){
-      var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+'/'+l.total_parcelas+'x</span>':l.pgto==='30d'?'<span class="badge" style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc">📅 30 dias</span>':l.pgto==='cartao'?'<span class="badge" style="background:#faf5ff;color:#7c3aed;border:1px solid #ddd6fe">💳 Cartão</span>':l.pgto==='avista'?'<span style="font-size:10px;color:var(--text4)">💵 À vista</span>':'';
+      var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+' de '+l.total_parcelas+'</span>':l.pgto==='30d'?'<span class="badge" style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc">📅 30 dias</span>':l.pgto==='cartao'?'<span class="badge" style="background:#faf5ff;color:#7c3aed;border:1px solid #ddd6fe">💳 Cartão</span>':l.pgto==='avista'?'<span style="font-size:10px;color:var(--text4)">💵 À vista</span>':'';
       var desc=l.descricao;
       if(REL.busca) desc=desc.replace(new RegExp('('+REL.busca+')','gi'),'<mark style="background:#fef08a;color:#111;border-radius:2px">$1</mark>');
       return'<tr><td style="white-space:nowrap">'+fD(l.data)+'</td><td>'+desc+'</td><td>'+(l.resp||'—')+'</td><td>'+catBadge(l.tipo)+'</td><td>'+pb+'</td><td style="font-family:var(--mono);text-align:right">'+fM(l.valor)+'</td></tr>';
@@ -2940,7 +2940,7 @@ function delLanc(id,obraId){
   var l=S.lancamentos.find(function(x){return x.id===id;});
   if(!l)return;
   var o=findO(l.obraId);
-  var parceladoMsg=l.total_parcelas>1?'<div class="alert al-warn" style="margin-bottom:14px"><span>📦</span><span>Este lançamento é parcelado ('+l.parcela+'/'+l.total_parcelas+'x). Você pode excluir só esta parcela ou todas.</span></div>':'';
+  var parceladoMsg=l.total_parcelas>1?'<div class="alert al-warn" style="margin-bottom:14px"><span>📦</span><span>Este lançamento é parcelado ('+l.parcela+' de '+l.total_parcelas+'). Você pode excluir só esta parcela ou todas.</span></div>':'';
   openModal(
     '<div class="mtitle" style="color:#dc2626">🗑 Confirmar Exclusão</div>'+
     '<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:var(--rsm);padding:12px 14px;margin-bottom:16px;font-size:12px">'+
@@ -2956,7 +2956,7 @@ function delLanc(id,obraId){
     (l.total_parcelas>1?
       '<div class="fg"><label class="flbl">O que excluir?</label>'+
         '<select class="fi" id="del-escopo">'+
-          '<option value="unica">Somente esta parcela ('+l.parcela+'/'+l.total_parcelas+')</option>'+
+          '<option value="unica">Somente esta parcela ('+l.parcela+' de '+l.total_parcelas+')</option>'+
           '<option value="todas">Todas as '+l.total_parcelas+' parcelas deste lançamento</option>'+
         '</select></div>':'')+
     '<div class="mactions">'+
@@ -3190,7 +3190,7 @@ function rFechamentos(){
 
     // Lista de lançamentos
     var lRows=lancs.slice().sort(function(a,b){return b.data.localeCompare(a.data);}).map(function(l){
-      var pb=l.parcela?l.parcela+'/'+l.total_parcelas+'x':l.pgto==='30d'?'📅 30d':l.pgto==='cartao'?'💳':l.pgto==='avista'?'À vista':'';
+      var pb=l.parcela?l.parcela+' de '+l.total_parcelas:l.pgto==='30d'?'📅 30d':l.pgto==='cartao'?'💳':l.pgto==='avista'?'À vista':'';
       return'<tr>'+
         '<td style="white-space:nowrap;font-size:12px">'+fD(l.data)+'</td>'+
         '<td style="font-size:12px">'+l.descricao+'</td>'+
@@ -3268,7 +3268,7 @@ function rExcluidos(){
   }).join('');
 
   var rows=lista.map(function(x){
-    var parcTxt=x.total_parcelas>1?'<span class="badge b-parcela" style="margin-left:4px">'+x.parcela+'/'+x.total_parcelas+'x</span>':'';
+    var parcTxt=x.total_parcelas>1?'<span class="badge b-parcela" style="margin-left:4px">'+x.parcela+' de '+x.total_parcelas+'</span>':'';
     return'<tr>'+
       '<td style="font-family:var(--mono);font-size:11px;white-space:nowrap">'+fD(x.excluido_em.substring(0,10))+'<br><span style="color:var(--text4)">'+x.excluido_em.substring(11,16)+'</span></td>'+
       '<td><span style="font-weight:500;color:#dc2626">'+x.excluido_por+'</span></td>'+
