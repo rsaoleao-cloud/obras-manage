@@ -468,6 +468,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
           <div class="fg"><label class="flbl">Obra</label><select class="fi" id="l-obra"></select></div>
           <div class="fg"><label class="flbl">Tipo de Despesa</label>
             <select class="fi" id="l-tipo">
+              <option value="fundos">🏦 Fundos</option>
               <option value="despesa">💼 Despesa / Serviço</option>
               <option value="almoco">🍽 Almoço / Alimentação</option>
               <option value="hospedagem">🏨 Hospedagem</option>
@@ -567,7 +568,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
         <!-- Filtros avançados -->
         <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:10px">
           <div><label class="flbl" style="display:block">Obra</label><select class="fi" id="h-obra" style="width:185px"></select></div>
-          <div><label class="flbl" style="display:block">Categoria</label><select class="fi" id="h-tipo" style="width:155px"><option value="">Todas</option><option value="despesa">💼 Despesa</option><option value="almoco">🍽 Almoço</option><option value="hospedagem">🏨 Hospedagem</option><option value="combustivel">⛽ Combustível</option><option value="prestador">🧑‍🔧 Prestador</option><option value="peca">🔩 Peça</option></select></div>
+          <div><label class="flbl" style="display:block">Categoria</label><select class="fi" id="h-tipo" style="width:155px"><option value="">Todas</option><option value="fundos">🏦 Fundos</option><option value="despesa">💼 Despesa</option><option value="almoco">🍽 Almoço</option><option value="hospedagem">🏨 Hospedagem</option><option value="combustivel">⛽ Combustível</option><option value="prestador">🧑‍🔧 Prestador</option><option value="peca">🔩 Peça</option></select></div>
           <div><label class="flbl" style="display:block">De</label><input class="fi" id="h-de" type="date" style="width:140px"></div>
           <div><label class="flbl" style="display:block">Até</label><input class="fi" id="h-ate" type="date" style="width:140px"></div>
         </div>
@@ -959,7 +960,10 @@ function nextMonths(n){
   }
   return r;
 }
-function gastosMes(oId,mes){return S.lancamentos.filter(function(l){return l.obraId===oId&&l.mes===mes;});}
+function gastosMes(oId,mes){
+  // Exclui Fundos dos gastos (fundos são contabilizados separadamente)
+  return S.lancamentos.filter(function(l){return l.obraId===oId&&l.mes===mes&&l.tipo!=='fundos';});
+}
 function totalMesObra(oId,mes){return gastosMes(oId,mes).reduce(function(a,l){return a+Number(l.valor);},0);}
 function totalObra(oId){return S.lancamentos.filter(function(l){return l.obraId===oId;}).reduce(function(a,l){return a+Number(l.valor);},0);}
 
@@ -967,22 +971,35 @@ function totalObra(oId){return S.lancamentos.filter(function(l){return l.obraId=
 var RESERVA_PCT = 0.12;
 function budgetEfetivo(o){
   if(!o||!o.budget) return 0;
-  return Number(o.budget) * (1 - RESERVA_PCT);
+  return Number(o.budget);
 }
 function reservaValor(o){
   if(!o||!o.budget) return 0;
-  return Number(o.budget) * RESERVA_PCT;
+  return 0;
 }
 // Retorna string descritiva do budget com reserva
 function fBudget(o){
   if(!o||!o.budget) return '—';
-  return fM(budgetEfetivo(o))+' <span style="font-size:10px;color:var(--text3);font-family:var(--mono)">('+fM(Number(o.budget))+' − 12% reserva)</span>';
+  return fM(budgetEfetivo(o))+' <span style="font-size:10px;color:var(--text3);font-family:var(--mono)">('+fM(Number(o.budget))+' )</span>';
 }
 
 function pctBudget(oId,mes){
   var o=findO(oId);
   if(!o||!o.budget) return 0;
   return (totalMesObra(oId,mes) / budgetEfetivo(o)) * 100;
+}
+
+// Total de Fundos acumulados de uma obra (todos os meses)
+function totalFundosObra(oId){
+  return S.lancamentos
+    .filter(function(l){return l.obraId===oId && l.tipo==='fundos';})
+    .reduce(function(a,l){return a+Number(l.valor);},0);
+}
+// Fundos do mês
+function totalFundosMes(oId,mes){
+  return S.lancamentos
+    .filter(function(l){return l.obraId===oId && l.tipo==='fundos' && l.mes===mes;})
+    .reduce(function(a,l){return a+Number(l.valor);},0);
 }
 function findO(id){return S.obras.find(function(x){return x.id===id;});}
 function diasPrazo(prazo){if(!prazo)return null;var h=new Date();h.setHours(0,0,0,0);var f=new Date(prazo+'T00:00:00');return Math.round((f-h)/86400000);}
@@ -1323,8 +1340,21 @@ function rDashboard(){
       '<div class="oc-status">'+statusBadge(o.status)+'</div>'+
       '<div class="oc-name">'+semaforo(o.prazo)+' &nbsp;'+o.nome+'</div>'+
       '<div class="oc-tempo">'+tempoObra(o.inicio,o.prazo)+'</div>'+
+      // Fundos acumulados — exibido no topo do card se houver
+      (function(){
+        var fTot=totalFundosObra(o.id);
+        if(!fTot)return'';
+        var fPct=contrato>0?((fTot/contrato)*100).toFixed(1):null;
+        return'<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:var(--rsm);padding:7px 10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">'+
+          '<div>'+
+            '<div style="font-size:9px;color:#059669;font-family:var(--mono);font-weight:600;text-transform:uppercase;letter-spacing:.4px">🏦 Fundos acumulados</div>'+
+            '<div style="font-size:15px;font-weight:700;color:#059669;font-family:var(--mono)">'+fM(fTot)+'</div>'+
+          '</div>'+
+          (fPct?'<div style="font-size:13px;font-weight:700;color:#059669;font-family:var(--mono)">'+fPct+'%<div style="font-size:9px;font-weight:400;color:#6b7280;text-align:right">do contrato</div></div>':'')+
+        '</div>';
+      })()+
       '<div class="oc-rows">'+
-        '<div class="oc-row"><span class="oc-rl">Budget disp. (−12%)</span><span class="oc-rv">'+fM(budgetEfetivo(o))+'</span></div>'+
+        '<div class="oc-row"><span class="oc-rl">Budget mensal</span><span class="oc-rv">'+fM(budgetEfetivo(o))+'</span></div>'+
         '<div class="oc-row"><span class="oc-rl">Gasto '+mesLabel(mes)+'</span><span class="oc-rv" style="color:'+cor+'">'+fM(tot)+'</span></div>'+
         '<div class="oc-row"><span class="oc-rl">Gasto total</span><span class="oc-rv">'+fM(totG)+'</span></div>'+
         (mg?'<div class="oc-row"><span class="oc-rl">Margem estimada</span><span class="oc-rv" style="color:'+(mg.margem>=0?'#16a34a':'#dc2626')+'">'+fM(mg.margem)+' ('+mg.pct+'%)</span></div>':'')+
@@ -1441,7 +1471,7 @@ function rObraDashboard(obraId){
       '<div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:3px;display:flex;gap:12px;flex-wrap:wrap">'+
         statusBadge(o.status)+
         (o.prazo?'<span>Prazo: '+fD(o.prazo)+'</span>':'')+
-        (o.budget?'<span>Budget disp. (−12%): '+fM(budgetEfetivo(o))+'</span>':'')+
+        (o.budget?'<span>Budget mensal: '+fM(budgetEfetivo(o))+'</span>':'')+
         (contrato?'<span>Contrato: '+fM(contrato)+'</span>':'')+
       '</div>'+
     '</div>'+
@@ -1449,18 +1479,24 @@ function rObraDashboard(obraId){
     '<button class="btn btn-primary" onclick="modalObra(\''+o.id+'\')">✏️ Editar</button>'+
   '</div>';
 
-  // Cards de resumo
-  h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:22px">';
-  // Total geral
-  h+=scCard('💰','Total Gasto',fM(totalGeral),'var(--accent)');
-  // Lançamentos
   var nlc=S.lancamentos.filter(function(l){return l.obraId===o.id;}).length;
-  h+=scCard('📝','Lançamentos',nlc+' lançamentos','var(--text2)');
-  // Margem
-  if(margemReal!==null) h+=scCard('📈','Margem Real',fM(margemReal)+' ('+margemPct+'%)',margemCor);
-  // Meses com despesa
-  h+=scCard('📅','Meses ativos',meses.length+' '+(meses.length===1?'mês':'meses'),'var(--info)');
-  h+='</div>';
+  // Cards de resumo
+  var fundosTot=totalFundosObra(o.id);
+  var fundosPct=contrato>0&&fundosTot>0?((fundosTot/contrato)*100).toFixed(1):null;
+  var fundosCard=fundosTot>0?
+    '<div class="fcard" style="padding:14px 16px;border:2px solid #86efac;background:#f0fdf4">'+
+      '<div style="font-size:10px;color:#059669;font-family:var(--mono);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">🏦 Fundos acumulados</div>'+
+      '<div style="font-size:20px;font-weight:700;color:#059669;font-family:var(--mono)">'+fM(fundosTot)+'</div>'+
+      (fundosPct?'<div style="font-size:11px;color:#6b7280;font-family:var(--mono);margin-top:3px">'+fundosPct+'% do contrato ('+fM(contrato)+')</div>':'')+
+    '</div>':'';
+
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:22px">'+
+    (fundosCard)+
+    scCard('💰','Total Gasto',fM(totalGeral),'var(--accent)')+
+    scCard('📝','Lançamentos',nlc+' lançamentos','var(--text2)')+
+    (margemReal!==null?scCard('📈','Margem Real',fM(margemReal)+' ('+margemPct+'%)',margemCor):'')+
+    scCard('📅','Meses ativos',meses.length+' '+(meses.length===1?'mês':'meses'),'var(--info)')+
+  '</div>';
 
   // Tabela por mês
   if(!meses.length){
@@ -1591,7 +1627,7 @@ function rObras(){
       '<div class="oc-name" style="cursor:pointer" data-id="'+o.id+'">'+semaforo(o.prazo)+' &nbsp;'+o.nome+'</div>'+
       '<div class="oc-tempo">'+tempoObra(o.inicio,o.prazo)+'</div>'+
       '<div class="oc-rows">'+
-        '<div class="oc-row"><span class="oc-rl">Budget disp. (−12%)</span><span class="oc-rv">'+fM(budgetEfetivo(o))+'</span></div>'+
+        '<div class="oc-row"><span class="oc-rl">Budget mensal</span><span class="oc-rv">'+fM(budgetEfetivo(o))+'</span></div>'+
         '<div class="oc-row"><span class="oc-rl">Custo previsto</span><span class="oc-rv">'+fM(o.custo_previsto||0)+'</span></div>'+
         '<div class="oc-row"><span class="oc-rl">Contrato fechado</span><span class="oc-rv" style="color:#0891b2">'+fM(o.contrato||0)+'</span></div>'+
         (mg?'<div class="oc-row"><span class="oc-rl">Margem estimada</span><span class="oc-rv" style="color:'+(mg.margem>=0?'#16a34a':'#dc2626')+'">'+fM(mg.margem)+' ('+mg.pct+'%)</span></div>':'')+
@@ -1600,7 +1636,7 @@ function rObras(){
         '<div class="oc-row"><span class="oc-rl">Prazo</span><span>'+prazoBadge(o.prazo)+'</span></div>'+
       '</div>'+
       '<div class="prog-wrap">'+
-        '<div class="prog-lbl"><span>Budget disponível (−12%) · Saldo: '+fM(Math.max(0,budgetEfetivo(o)-tot))+'</span><span style="color:'+cor+'">'+p.toFixed(0)+'%</span></div>'+
+        '<div class="prog-lbl"><span>Budget mensal · Saldo: '+fM(Math.max(0,budgetEfetivo(o)-tot))+'</span><span style="color:'+cor+'">'+p.toFixed(0)+'%</span></div>'+
         '<div class="prog-bar"><div class="prog-fill '+cls+'" style="width:'+Math.min(p,100)+'%"></div></div>'+
       '</div>'+
       '<div class="oc-actions">'+
@@ -1637,11 +1673,10 @@ function rDetalhe(obraId){
 
   function catSC(cat,val,budget){
     var c=CATEGORIAS[cat];
-    // Aplica 12% de reserva no limite da categoria também
-    var budgetEf=budget&&Number(budget)>0?Number(budget)*(1-RESERVA_PCT):null;
+    var budgetEf=budget&&Number(budget)>0?Number(budget):null;
     var pctC=budgetEf?((val/budgetEf)*100):null;
     var numClr=pctC===null?c.cor:pctC>=100?'#dc2626':pctC>=90?'#ea580c':pctC>=70?'#d97706':'#16a34a';
-    var limiteTxt=budgetEf?'<div style="font-size:9px;color:'+numClr+';font-family:var(--mono);margin-top:2px">'+pctC.toFixed(0)+'% de '+fM(budgetEf)+' (−12%)</div>':'';
+    var limiteTxt=budgetEf?'<div style="font-size:9px;color:'+numClr+';font-family:var(--mono);margin-top:2px">'+pctC.toFixed(0)+'% de '+fM(budgetEf)+'</div>':'';
     return'<div class="det-sc" style="border-top:3px solid '+c.cor+'"><div class="det-num" style="color:'+numClr+';font-size:14px">'+fM(val)+'</div><div class="det-lbl">'+c.icon+' '+c.label+'</div>'+limiteTxt+'</div>';
   }
 
@@ -1676,7 +1711,7 @@ function rDetalhe(obraId){
     // row 1 — budget geral
     '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px">'+
       prazoInfo+
-      '<div class="det-sc"><div class="det-num">'+fM(budgetEfetivo(o))+'</div><div class="det-lbl">Budget disp. (−12%)</div></div>'+
+      '<div class="det-sc"><div class="det-num">'+fM(budgetEfetivo(o))+'</div><div class="det-lbl">Budget mensal</div></div>'+
       '<div class="det-sc"><div class="det-num" style="color:'+cor+'">'+fM(tot)+'</div><div class="det-lbl">Gasto '+mesLabel(mes)+'<br><span style="font-size:9px;font-family:var(--mono);color:'+cor+'">'+p.toFixed(0)+'% · Saldo '+fM(Math.max(0,budgetEfetivo(o)-tot))+'</span></div></div>'+
       '<div class="det-sc"><div class="det-num">'+fM(totG)+'</div><div class="det-lbl">Total acumulado</div></div>'+
     '</div>'+
@@ -2411,7 +2446,7 @@ function renderRelatorioFiltros(){
       '<button id="rel-voltar" class="btn" style="flex-shrink:0">← Obras</button>'+
       '<div>'+
         '<div style="font-family:var(--serif);font-size:18px;font-weight:700">'+o.nome+'</div>'+
-        '<div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:2px">'+statusBadge(o.status)+(o.prazo?' &nbsp;Prazo: '+fD(o.prazo):'')+' &nbsp;Budget disp. (−12%): '+fM(budgetEfetivo(o))+'</div>'+
+        '<div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:2px">'+statusBadge(o.status)+(o.prazo?' &nbsp;Prazo: '+fD(o.prazo):'')+' &nbsp;Budget mensal: '+fM(budgetEfetivo(o))+'</div>'+
       '</div>'+
       '<button class="btn" id="rel-imprimir" style="margin-left:auto">🖨 PDF</button>'+
     '</div>'+
@@ -2423,6 +2458,7 @@ function renderRelatorioFiltros(){
         '<div><label class="flbl" style="display:block">Tipo de despesa</label>'+
           '<select class="fi" id="rel-sel-cat" style="width:180px">'+
             '<option value="">Todas as categorias</option>'+
+            '<option value="fundos">🏦 Fundos</option>'+
             '<option value="despesa">💼 Despesa</option>'+
             '<option value="almoco">🍽 Almoço</option>'+
             '<option value="hospedagem">🏨 Hospedagem</option>'+
@@ -2498,7 +2534,7 @@ function renderRelatorioResultado(){
 
   h+='<div class="rel-os"><div class="rel-ot">'+
     '<span>'+o.nome+' · '+mesLabel(REL.mes)+'</span>'+
-    '<span style="font-family:var(--mono);font-size:12px;color:'+cor+'">'+pp+'% do budget disp. ('+fM(budgetEfetivo(o))+')</span>'+
+    '<span style="font-family:var(--mono);font-size:12px;color:'+cor+'">'+pp+'% do budget</span>'+
   '</div><div class="rel-bi">';
 
   if(REL.cat){
@@ -2519,10 +2555,10 @@ function renderRelatorioResultado(){
       var tCat=arr.reduce(function(a,l){return a+Number(l.valor);},0);
       var c3=CATEGORIAS[cat]||CATEGORIAS.despesa;
       var bCat=cat==='almoco'?o.b_almoco:cat==='hospedagem'?o.b_hospedagem:cat==='combustivel'?o.b_combustivel:cat==='prestador'?o.b_prestador:'';
-      var bCatEf=bCat&&Number(bCat)>0?Number(bCat)*(1-RESERVA_PCT):null;
+      var bCatEf=bCat&&Number(bCat)>0?Number(bCat):null;
       var cPct=bCatEf?((tCat/bCatEf)*100):null;
       var cCor=cPct===null?c3.cor:cPct>=100?'#ef4444':cPct>=90?'#ea580c':cPct>=70?'#f59e0b':'#10b981';
-      var lTxt=bCatEf?' · '+cPct.toFixed(0)+'% de '+fM(bCatEf)+' (−12%)':
+      var lTxt=bCatEf?' · '+cPct.toFixed(0)+'% de '+fM(bCatEf)+'':
       h+='<div style="padding:7px 14px;background:'+c3.bg+';border-bottom:1px solid var(--border);font-size:10px;font-family:var(--mono);text-transform:uppercase;display:flex;justify-content:space-between">'+
         '<span style="color:'+c3.cor+'">'+c3.icon+' '+c3.label+'</span><span style="color:'+cCor+'">'+fM(tCat)+lTxt+'</span></div>'+
         '<table><thead><tr><th>Data</th><th>Descrição</th><th>Resp.</th><th>Tipo</th><th>Pgto</th><th style="text-align:right">Valor</th></tr></thead><tbody>'+makeRows(arr)+'</tbody></table>'+
@@ -2572,7 +2608,7 @@ function renderRelatorioResultado(){
       var labelRest=restante>=0?'Saldo do budget':'Estouro do budget';
       budgetRow=
         '<tr style="border-top:1px solid var(--border2)">'+
-          '<td colspan="3" style="padding:8px 12px;color:var(--text3);font-size:12px">Budget declarado: '+fM(Number(o.budget))+' / Disponível (−12%): '+fM(budgetEfetivo(o))+' · '+pp+'% utilizado</td>'+
+          '<td colspan="3" style="padding:8px 12px;color:var(--text3);font-size:12px">Budget declarado: '+fM(Number(o.budget))+' / Disponível: '+fM(budgetEfetivo(o))+' · '+pp+'% utilizado</td>'+
           '<td style="font-family:var(--mono);text-align:right;font-weight:600;color:'+corRest+';padding:8px 12px;font-size:13px">'+
             '<span style="font-size:10px;display:block;color:var(--text3)">'+labelRest+'</span>'+
             fM(Math.abs(restante))+
@@ -2730,7 +2766,7 @@ function modalLanc(obraId){
   openModal(
     '<div class="mtitle">Novo Lançamento</div>'+
     '<div class="fl"><div class="fg"><label class="flbl">Obra</label><select class="fi" id="ml-obra">'+opts+'</select></div>'+
-    '<div class="fg"><label class="flbl">Categoria</label><select class="fi" id="ml-tipo"><option value="despesa">💼 Despesa / Serviço</option><option value="almoco">🍽 Almoço / Alimentação</option><option value="hospedagem">🏨 Hospedagem</option><option value="combustivel">⛽ Combustível</option><option value="prestador">🧑‍🔧 Prestador</option><option value="peca">🔩 Peça / Material</option></select></div></div>'+
+    '<div class="fg"><label class="flbl">Categoria</label><select class="fi" id="ml-tipo"><option value="fundos">🏦 Fundos</option><option value="despesa">💼 Despesa / Serviço</option><option value="almoco">🍽 Almoço / Alimentação</option><option value="hospedagem">🏨 Hospedagem</option><option value="combustivel">⛽ Combustível</option><option value="prestador">🧑‍🔧 Prestador</option><option value="peca">🔩 Peça / Material</option></select></div></div>'+
     '<div class="fg"><label class="flbl">Descrição</label><input class="fi" id="ml-desc" placeholder="Ex: Câmeras externas – 6un"></div>'+
     '<div class="fl"><div class="fg"><label class="flbl">Responsável</label><input class="fi" id="ml-resp" placeholder="Opcional"></div>'+
     '<div class="fg"><label class="flbl">Forma de Pagamento</label><select class="fi" id="ml-pgto"><option value="avista">💵 À vista</option><option value="30d">📅 Prazo 30 dias</option><option value="cartao">💳 Cartão</option><option value="3x">📆 3x</option><option value="5x">📆 5x</option></select></div></div>'+
@@ -2805,6 +2841,7 @@ function delObra(id){
 }
 
 var CATEGORIAS={
+  fundos:{label:'Fundos',icon:'🏦',cor:'#059669',bg:'#f0fdf4',border:'#86efac'},
   despesa:{label:'Despesa',icon:'💼',cor:'#1d4ed8',bg:'#eff6ff',border:'#bfdbfe'},
   almoco:{label:'Almoço',icon:'🍽',cor:'#b45309',bg:'#fffbeb',border:'#fcd34d'},
   hospedagem:{label:'Hospedagem',icon:'🏨',cor:'#0e7490',bg:'#ecfeff',border:'#a5f3fc'},
@@ -2904,10 +2941,10 @@ function checkAlerta(obraId,mes){
   var cats=[{cat:'almoco',budget:o.b_almoco,nome:'Almoço'},{cat:'hospedagem',budget:o.b_hospedagem,nome:'Hospedagem'},{cat:'combustivel',budget:o.b_combustivel,nome:'Combustível'},{cat:'prestador',budget:o.b_prestador,nome:'Prestador'}];
   cats.forEach(function(c){
     if(!c.budget||Number(c.budget)<=0)return;
-    var limEf=Number(c.budget)*(1-RESERVA_PCT); // aplica 12% de reserva
+    var limEf=Number(c.budget);
     var gasto=totalCatMes(obraId,mes,c.cat);
     var pp=(gasto/limEf)*100;
-    if(pp>=100) msgs.push({nivel:'danger',txt:'🔴 '+c.nome+': limite ESTOURADO!\nGasto: '+fM(gasto)+' / Limite disp.(−12%): '+fM(limEf)});
+    if(pp>=100) msgs.push({nivel:'danger',txt:'🔴 '+c.nome+': limite ESTOURADO!\nGasto: '+fM(gasto)+' / Limite: '+fM(limEf)});
     else if(pp>=90) msgs.push({nivel:'warn90',txt:'🟠 '+c.nome+': '+pp.toFixed(0)+'% do limite usado ('+fM(gasto)+' / '+fM(limEf)+')'});
     else if(pp>=70) msgs.push({nivel:'warn70',txt:'🟡 '+c.nome+': '+pp.toFixed(0)+'% do limite ('+fM(gasto)+' / '+fM(limEf)+')'});
   });
