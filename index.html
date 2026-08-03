@@ -2093,7 +2093,7 @@ function atualizarPreview(){
   if(cartaoWrap) cartaoWrap.style.display=tipo==='cartao'?'flex':'none';
   if(prazoWrap) prazoWrap.style.display=tipo==='30d'?'block':'none';
 
-  // Preenche data padrão nos campos de vencimento
+  // Preenche data padrão
   if(tipo==='30d'){
     var dpEl=document.getElementById('l-prazo-data');
     if(dpEl&&!dpEl.value) dpEl.value=addDias(dataVal,30).data;
@@ -2115,30 +2115,51 @@ function atualizarPreview(){
     var prazoData=(document.getElementById('l-prazo-data')||{}).value||addDias(dataVal,30).data;
     var prazoMes=prazoData.substring(0,7);
     rows='<div class="parc-row">'+
-      '<span>📅 Vencimento: <strong>'+fD(prazoData)+'</strong></span>'+
-      '<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">Mês: '+mesLabel(prazoMes)+'</span>'+
+      '<span>📅 Vencimento</span>'+
+      '<input type="date" id="parc-date-0" value="'+prazoData+'" class="fi" style="width:140px;padding:4px 8px;font-size:12px" onchange="atualizarPreview()">'+
+      '<span style="font-size:10px;color:var(--text3);font-family:var(--mono)" id="parc-mes-0">'+mesLabel(prazoMes)+'</span>'+
       '<span>'+fM(valor)+'</span></div>';
   } else if(tipo==='cartao'){
     var cartaoData=(document.getElementById('l-cartao-data')||{}).value||addDias(dataVal,30).data;
     for(var i=0;i<cartaoN;i++){
-      var r=i===0?{data:cartaoData,mes:cartaoData.substring(0,7)}:addDias(cartaoData,i*30);
+      // Pega data editada se existir
+      var existEl=document.getElementById('parc-date-'+i);
+      var dBase=existEl?existEl.value:(i===0?cartaoData:addDias(cartaoData,i*30).data);
+      var mesBase=dBase.substring(0,7);
       rows+='<div class="parc-row">'+
-        '<span>💳 '+(i+1)+' de '+cartaoN+' · <strong>'+fD(r.data)+'</strong></span>'+
-        '<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">'+mesLabel(r.mes)+'</span>'+
+        '<span>💳 '+(i+1)+' de '+cartaoN+'</span>'+
+        '<input type="date" id="parc-date-'+i+'" value="'+dBase+'" class="fi" style="width:140px;padding:4px 8px;font-size:12px" onchange="recalcParc()">'+
+        '<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">'+mesLabel(mesBase)+'</span>'+
         '<span>'+fM(parcVal)+'</span></div>';
     }
-    if(cartaoN>1) rows+='<div class="parc-row" style="font-weight:600"><span>Total cartão</span><span>'+fM(valor)+'</span></div>';
+    if(cartaoN>1) rows+='<div class="parc-row" style="font-weight:600"><span>Total</span><span>'+fM(valor)+'</span></div>';
   } else {
+    // Parcelado 3x, 5x, custom — datas editáveis
     for(var i=0;i<n;i++){
-      var r=addDias(dataVal, i*30);
+      var existEl=document.getElementById('parc-date-'+i);
+      var dBase=existEl?existEl.value:addDias(dataVal,i*30).data;
+      var mesBase=dBase.substring(0,7);
       rows+='<div class="parc-row">'+
-        '<span>'+(i+1)+' de '+n+' · <strong>'+fD(r.data)+'</strong></span>'+
-        '<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">'+mesLabel(r.mes)+'</span>'+
+        '<span>'+(i+1)+' de '+n+'</span>'+
+        '<input type="date" id="parc-date-'+i+'" value="'+dBase+'" class="fi" style="width:140px;padding:4px 8px;font-size:12px" onchange="recalcParc()">'+
+        '<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">'+mesLabel(mesBase)+'</span>'+
         '<span>'+fM(parcVal)+'</span></div>';
     }
     rows+='<div class="parc-row" style="font-weight:600"><span>Total</span><span>'+fM(valor)+'</span></div>';
   }
   preview.innerHTML='<div class="parc-preview">'+rows+'</div>';
+}
+
+// Atualiza mês ao editar data manualmente
+function recalcParc(){
+  var i=0;
+  while(document.getElementById('parc-date-'+i)){
+    var el=document.getElementById('parc-date-'+i);
+    var mes=el.value?el.value.substring(0,7):'';
+    var next=el.nextElementSibling;
+    if(next&&next.tagName==='SPAN') next.textContent=mes?mesLabel(mes):'';
+    i++;
+  }
 }
 
 // ===== HISTÓRICO =====
@@ -2896,28 +2917,28 @@ function checkAlerta(obraId,mes){
   }
 }
 
-function criarLancamentos(obraId,tipo,desc,resp,valor,data,pgto,nparcelas,pgtoData){
+function criarLancamentos(obraId,tipo,desc,resp,valor,data,pgto,nparcelas,pgtoData,parcDatas){
   // pgtoData = data de vencimento/fatura para prazo e cartao
+  // parcDatas = array de datas editadas pelo usuário para cada parcela
   var n=pgto==='avista'?1:pgto==='30d'?1:pgto==='cartao'?parseInt(nparcelas)||1:pgto==='3x'?3:pgto==='5x'?5:parseInt(nparcelas)||1;
   var parcVal=Number(valor)/n;
 
   var parcelas=[];
   if(pgto==='30d'){
-    // Usa a data de vencimento informada
     var venc=pgtoData||addDias(data,30).data;
     parcelas.push({data:venc, mes:venc.substring(0,7)});
   } else if(pgto==='cartao'){
-    // Parcelas do cartão a partir da data da fatura informada
     var fatData=pgtoData||addDias(data,30).data;
     for(var i=0;i<n;i++){
-      var r=i===0?{data:fatData,mes:fatData.substring(0,7)}:addDias(fatData,i*30);
-      parcelas.push(r);
+      var d2=parcDatas&&parcDatas[i]?parcDatas[i]:(i===0?fatData:addDias(fatData,i*30).data);
+      parcelas.push({data:d2,mes:d2.substring(0,7)});
     }
   } else if(pgto==='avista'){
     parcelas.push({data:data, mes:data.substring(0,7)});
   } else {
     for(var i=0;i<n;i++){
-      parcelas.push(addDias(data, i*30));
+      var d2=parcDatas&&parcDatas[i]?parcDatas[i]:addDias(data,i*30).data;
+      parcelas.push({data:d2,mes:d2.substring(0,7)});
     }
   }
 
@@ -2959,9 +2980,16 @@ function saveLanc(){
   var pgtoData='';
   if(pgto==='30d') pgtoData=(document.getElementById('l-prazo-data')||{}).value||addDias(data,30).data;
   if(pgto==='cartao') pgtoData=(document.getElementById('l-cartao-data')||{}).value||addDias(data,30).data;
+  // Coleta datas editadas pelo usuário nas parcelas
+  var parcDatas=[];
+  var idx=0;
+  while(document.getElementById('parc-date-'+idx)){
+    parcDatas.push(document.getElementById('parc-date-'+idx).value);
+    idx++;
+  }
   if(!obraId){alert('Selecione uma obra');return;}
   if(!desc||!valor||valor<=0){alert('Preencha descrição e valor');return;}
-  criarLancamentos(obraId,tipo,desc,resp,valor,data,pgto,np,pgtoData);
+  criarLancamentos(obraId,tipo,desc,resp,valor,data,pgto,np,pgtoData,parcDatas.length?parcDatas:null);
   // Lançamento recorrente
   var recChk=document.getElementById('l-recorrente');
   if(recChk&&recChk.checked){
