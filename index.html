@@ -386,7 +386,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
   <aside class="sidebar">
     <div class="logo">
       <div class="logo-title">SP8 Obras</div>
-      <div class="logo-sub">PRO · GESTÃO COMPLETA v5.6</div>
+      <div class="logo-sub">PRO · GESTÃO COMPLETA v5.7</div>
     </div>
     <div class="nav">
       <div class="nav-lbl">Menu</div>
@@ -409,7 +409,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
       <div class="hdr-title" id="hdr-title">Dashboard</div>
     </div>
     <div class="hdr-right">
-      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v5.6</span>
+      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v5.7</span>
       <span id="user-chip" class="user-avatar-chip" style="display:none">
         <span class="user-avatar-sm" id="user-avatar-letter">?</span>
         <span id="user-nome-chip">—</span>
@@ -1815,15 +1815,17 @@ function rDetalhe(obraId){
           '<div style="width:2px;height:70px;background:linear-gradient(to bottom,transparent,#86efac,transparent);margin:0 28px"></div>'+
           // IMPOSTO
           '<div>'+
-            '<div style="font-size:11px;font-weight:700;color:#b45309;font-family:var(--mono);text-transform:uppercase;margin-bottom:10px">🧾 Previsão Imposto (6% budget)</div>'+
+            '<div style="font-size:11px;font-weight:700;color:#b45309;font-family:var(--mono);text-transform:uppercase;margin-bottom:10px">🧾 Previsão Imposto (6% do faturamento mensal)</div>'+
             '<div style="display:flex;gap:28px;flex-wrap:wrap">'+
               '<div>'+
-                '<div style="font-size:11px;color:#6b7280;font-family:var(--mono);margin-bottom:3px">'+mesLabel(mes)+' (mês atual)</div>'+
+                '<div style="font-size:11px;color:#6b7280;font-family:var(--mono);margin-bottom:3px">'+mesLabel(mes)+' · <span style="color:#dc2626;font-weight:700">vence dia 20</span></div>'+
                 '<div style="font-size:26px;font-weight:800;color:'+(iMes>0?'#b45309':'#9ca3af')+';font-family:var(--mono);line-height:1">'+fM(iMes||0)+'</div>'+
               '</div>'+
               '<div>'+
-                '<div style="font-size:11px;color:#6b7280;font-family:var(--mono);margin-bottom:3px">Total previsto</div>'+
+                '<div style="font-size:11px;color:#6b7280;font-family:var(--mono);margin-bottom:3px">Total até o prazo da obra'+(o.prazo?' ('+fD(o.prazo)+')':'')+
+                '</div>'+
                 '<div style="font-size:26px;font-weight:800;color:'+(iTot>0?'#b45309':'#9ca3af')+';font-family:var(--mono);line-height:1">'+fM(iTot||0)+'</div>'+
+                '<div style="font-size:10px;color:#9ca3af;font-family:var(--mono);margin-top:2px">6% × R$'+fM(Number(o.budget||0))+'/mês</div>'+
               '</div>'+
             '</div>'+
           '</div>'+
@@ -3069,28 +3071,28 @@ function saveObra(id){
 }
 
 // Gera lançamentos mensais de "Previsão Imposto" (6% do budget)
-// do mês atual até o prazo da obra, atualizando se já existirem
+// Vencimento todo dia 20 do mês, do mês atual até o prazo da obra
 function gerarImpostoObra(o){
   if(!o||!o.budget||Number(o.budget)<=0) return;
-  var ALIQ = 0.06; // 6%
-  var valorImposto = Number(o.budget) * ALIQ;
+  var ALIQ = 0.06;
+  var valorImposto = Math.round(Number(o.budget) * ALIQ * 100) / 100;
   var mesInicio = mesAtual();
-  var prazo = o.prazo; // YYYY-MM-DD
+  var prazo = o.prazo;
 
-  // Calcula meses de vigência
+  // Meses de vigência — do atual até o prazo
   var meses = [];
   var m = mesInicio;
   var limite = prazo ? prazo.substring(0,7) : '';
   for(var i=0; i<60; i++){
     meses.push(m);
     if(limite && m >= limite) break;
-    var p = m.split('-');
-    var yr = parseInt(p[0]); var mo = parseInt(p[1])+1;
-    if(mo>12){mo=1;yr++;}
-    m = yr+'-'+pad(mo);
+    var p2 = m.split('-');
+    var yr2 = parseInt(p2[0]); var mo2 = parseInt(p2[1])+1;
+    if(mo2>12){mo2=1;yr2++;}
+    m = yr2+'-'+pad(mo2);
   }
 
-  // Remove lançamentos futuros de imposto desta obra (serão recriados)
+  // Remove futuros de imposto desta obra
   var removidos = [];
   S.lancamentos = S.lancamentos.filter(function(l){
     if(l.obraId===o.id && l.tipo==='imposto' && l.mes >= mesInicio){
@@ -3099,21 +3101,20 @@ function gerarImpostoObra(o){
     }
     return true;
   });
-  // Remove do Firebase
   removidos.forEach(function(lid){
     if(FB) FB.collection('lancamentos').doc(lid).delete().catch(function(){});
   });
 
-  // Cria novos lançamentos mensais de imposto
+  // Cria novos — vencimento dia 20 de cada mês
   meses.forEach(function(mes){
-    if(mesFechado(mes)) return; // não lança em mês fechado
-    var dp = mes+'-01';
+    if(mesFechado(mes)) return;
+    var dp = mes+'-20'; // vence todo dia 20
     var l = {
       id: 'imp'+o.id+mes,
       obraId: o.id,
       tipo: 'imposto',
       pgto: 'avista',
-      descricao: 'Previsão Imposto (6%)',
+      descricao: 'Previsão Imposto 6% — vence dia 20',
       resp: '',
       valor: valorImposto,
       data: dp,
