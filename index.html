@@ -2717,22 +2717,33 @@ function rConfig(){
   if(fixBtn){
     fixBtn.onclick=function(){
       var corrigidos=0;
+      var res=document.getElementById('cfg-fix-fundos-result');
+      // Debug: mostra quantos lançamentos existem
+      var total=S.lancamentos.length;
+      var comFundo=S.lancamentos.filter(function(l){
+        return l.descricao&&l.descricao.toLowerCase().indexOf('fund')!==-1;
+      });
+      if(total===0){
+        res.style.color='#f59e0b';
+        res.textContent='⚠ Nenhum lançamento carregado ainda. Aguarde a sincronização e tente novamente.';
+        return;
+      }
+      // Corrige lançamentos com "fund" na descrição
       S.lancamentos.forEach(function(l){
-        if(l.tipo!=='fundos'&&l.descricao&&l.descricao.toLowerCase().indexOf('fundo')!==-1){
+        if(l.tipo!=='fundos'&&l.descricao&&l.descricao.toLowerCase().indexOf('fund')!==-1){
           l.tipo='fundos';
           corrigidos++;
           pushLanc(l);
         }
       });
       sv();
-      var res=document.getElementById('cfg-fix-fundos-result');
       if(corrigidos>0){
         res.style.color='#059669';
         res.textContent='✅ '+corrigidos+' lançamento(s) corrigido(s) para tipo Fundos!';
         rConfig();
       } else {
         res.style.color='var(--text3)';
-        res.textContent='Nenhum lançamento com "fundo" na descrição encontrado.';
+        res.textContent='Total de lançamentos: '+total+' · Com "fund" na descrição: '+comFundo.length+' (todos já são tipo Fundos)';
       }
     };
   }
