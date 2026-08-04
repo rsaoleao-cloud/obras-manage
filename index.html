@@ -536,15 +536,17 @@ select.fi option{background:var(--bg2);color:var(--text)}
         <div id="l-recorrente-wrap" style="display:none;padding:10px 12px;background:var(--bg3);border-radius:var(--rsm);border:1px solid var(--border2)">
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
             <div><label class="flbl" style="display:block;margin-bottom:4px">Repetir por</label>
-              <select class="fi" id="l-recorrente-meses" style="width:150px">
+              <select class="fi" id="l-recorrente-meses" style="width:190px">
+                <option value="prazo">Até o final da obra</option>
                 <option value="2">2 meses</option>
                 <option value="3">3 meses</option>
-                <option value="6" selected>6 meses</option>
+                <option value="6">6 meses</option>
                 <option value="12">12 meses</option>
+                <option value="24">24 meses</option>
               </select>
             </div>
             <div style="font-size:11px;color:var(--text3);font-family:var(--mono);max-width:260px;line-height:1.5">
-              Cria lançamentos idênticos nos próximos meses selecionados, mantendo o dia do mês.
+              Cria lançamentos mensais nos próximos meses. Para Fundos, selecione "Até o final da obra".
             </div>
           </div>
         </div>
@@ -1340,18 +1342,20 @@ function rDashboard(){
       '<div class="oc-status">'+statusBadge(o.status)+'</div>'+
       '<div class="oc-name">'+semaforo(o.prazo)+' &nbsp;'+o.nome+'</div>'+
       '<div class="oc-tempo">'+tempoObra(o.inicio,o.prazo)+'</div>'+
-      // Fundos acumulados — exibido no topo do card se houver
+      // Fundos — mês atual e acumulado
       (function(){
+        var fMes=totalFundosMes(o.id,mes);
         var fTot=totalFundosObra(o.id);
-        if(!fTot)return'';
-        var fPct=contrato>0?((fTot/contrato)*100).toFixed(1):null;
-        return'<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:var(--rsm);padding:7px 10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">'+
-          '<div>'+
-            '<div style="font-size:9px;color:#059669;font-family:var(--mono);font-weight:600;text-transform:uppercase;letter-spacing:.4px">🏦 Fundos acumulados</div>'+
-            '<div style="font-size:15px;font-weight:700;color:#059669;font-family:var(--mono)">'+fM(fTot)+'</div>'+
-          '</div>'+
-          (fPct?'<div style="font-size:13px;font-weight:700;color:#059669;font-family:var(--mono)">'+fPct+'%<div style="font-size:9px;font-weight:400;color:#6b7280;text-align:right">do contrato</div></div>':'')+
-        '</div>';
+        if(!fTot&&!fMes)return'';
+        var fPct=contrato>0&&fTot>0?((fTot/contrato)*100).toFixed(1):null;
+        return'<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:var(--rsm);padding:8px 12px;margin-bottom:8px">'+
+          '<div style="font-size:9px;color:#059669;font-family:var(--mono);font-weight:600;text-transform:uppercase;margin-bottom:5px">🏦 Fundos</div>'+
+          '<div style="display:flex;justify-content:space-between;align-items:baseline">'+
+            '<div><div style="font-size:10px;color:#6b7280;font-family:var(--mono)">'+mesLabel(mes)+'</div>'+
+            '<div style="font-size:14px;font-weight:700;color:#059669;font-family:var(--mono)">'+fM(fMes||0)+'</div></div>'+
+            '<div style="text-align:right"><div style="font-size:10px;color:#6b7280;font-family:var(--mono)">Acumulado</div>'+
+            '<div style="font-size:14px;font-weight:700;color:#059669;font-family:var(--mono)">'+fM(fTot)+(fPct?' <span style="font-size:10px;font-weight:400">('+fPct+'%)</span>':'')+'</div></div>'+
+          '</div></div>';
       })()+
       '<div class="oc-rows">'+
         '<div class="oc-row"><span class="oc-rl">Budget mensal</span><span class="oc-rv">'+fM(budgetEfetivo(o))+'</span></div>'+
@@ -1709,16 +1713,36 @@ function rDetalhe(obraId){
       '<div style="margin-left:auto;display:flex;gap:6px;align-items:center">'+statusBadge(o.status)+semaforo(o.prazo)+'</div>'+
     '</div>'+
     // row 1 — budget geral
-    // Fundos acumulados
+    // Fundos — mês corrente e acumulado
     (function(){
+      var fMes=totalFundosMes(o.id,mes);
       var fTot=totalFundosObra(o.id);
-      if(!fTot)return'';
+      if(!fTot&&!fMes)return'';
       var contrato2=Number(o.contrato)||0;
-      var fPct=contrato2>0?((fTot/contrato2)*100).toFixed(1):null;
-      return'<div class="det-sc" style="border-top:3px solid #059669;background:#f0fdf4;margin-bottom:12px">'+
-        '<div class="det-num" style="color:#059669">'+fM(fTot)+'</div>'+
-        '<div class="det-lbl">🏦 Fundos acumulados'+(fPct?' · <span style="color:#059669">'+fPct+'% do contrato</span>':'')+
-        '</div></div>';
+      var fPct=contrato2>0&&fTot>0?((fTot/contrato2)*100).toFixed(1):null;
+      var mesesComFundo=S.lancamentos.filter(function(l){return l.obraId===o.id&&l.tipo==='fundos';}).length;
+      return'<div style="background:#f0fdf4;border:2px solid #86efac;border-radius:var(--r);padding:14px 18px;margin-bottom:14px;display:flex;gap:24px;align-items:center;flex-wrap:wrap">'+
+        '<div style="font-size:11px;color:#059669;font-family:var(--mono);font-weight:600;text-transform:uppercase;letter-spacing:.5px;width:100%;margin-bottom:4px">🏦 Fundos da Obra</div>'+
+        '<div>'+
+          '<div style="font-size:11px;color:#6b7280;font-family:var(--mono)">'+mesLabel(mes)+'</div>'+
+          '<div style="font-size:20px;font-weight:700;color:#059669;font-family:var(--mono)">'+fM(fMes||0)+'</div>'+
+          '<div style="font-size:10px;color:#6b7280;font-family:var(--mono)">mês atual</div>'+
+        '</div>'+
+        '<div style="width:1px;height:40px;background:#86efac"></div>'+
+        '<div>'+
+          '<div style="font-size:11px;color:#6b7280;font-family:var(--mono)">Acumulado</div>'+
+          '<div style="font-size:20px;font-weight:700;color:#059669;font-family:var(--mono)">'+fM(fTot)+'</div>'+
+          '<div style="font-size:10px;color:#6b7280;font-family:var(--mono)">'+mesesComFundo+' mês(es)</div>'+
+        '</div>'+
+        (fPct?
+          '<div style="width:1px;height:40px;background:#86efac"></div>'+
+          '<div>'+
+            '<div style="font-size:11px;color:#6b7280;font-family:var(--mono)">% do Contrato</div>'+
+            '<div style="font-size:20px;font-weight:700;color:#059669;font-family:var(--mono)">'+fPct+'%</div>'+
+            '<div style="font-size:10px;color:#6b7280;font-family:var(--mono)">de '+fM(contrato2)+'</div>'+
+          '</div>':'')+
+        '<button class="btn no-print" style="margin-left:auto;font-size:11px" onclick="showPage(\'historico\')">✏️ Alterar valor</button>'+
+      '</div>';
     })()+
     '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px">'+
       prazoInfo+
@@ -3041,8 +3065,22 @@ function saveLanc(){
   // Lançamento recorrente
   var recChk=document.getElementById('l-recorrente');
   if(recChk&&recChk.checked){
-    var nMeses=parseInt(document.getElementById('l-recorrente-meses').value)||6;
-    criarLancamentosRecorrentes(obraId,tipo,desc,resp,valor,data,pgto,nMeses);
+    var recSelVal=document.getElementById('l-recorrente-meses').value;
+    var nMeses=0;
+    if(recSelVal==='prazo'){
+      // Calcula meses até o prazo da obra
+      var obraRec=findO(obraId);
+      if(obraRec&&obraRec.prazo){
+        var dAtual=new Date(data+'T12:00:00');
+        var dPrazo=new Date(obraRec.prazo+'T12:00:00');
+        nMeses=Math.max(1,(dPrazo.getFullYear()-dAtual.getFullYear())*12+(dPrazo.getMonth()-dAtual.getMonth()));
+      } else {
+        nMeses=12; // fallback se obra sem prazo
+      }
+    } else {
+      nMeses=parseInt(recSelVal)||6;
+    }
+    if(nMeses>0) criarLancamentosRecorrentes(obraId,tipo,desc,resp,valor,data,pgto,nMeses);
     recChk.checked=false;
     document.getElementById('l-recorrente-wrap').style.display='none';
   }
