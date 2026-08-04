@@ -1709,13 +1709,24 @@ function rDetalhe(obraId){
       '<div style="margin-left:auto;display:flex;gap:6px;align-items:center">'+statusBadge(o.status)+semaforo(o.prazo)+'</div>'+
     '</div>'+
     // row 1 — budget geral
+    // Fundos acumulados
+    (function(){
+      var fTot=totalFundosObra(o.id);
+      if(!fTot)return'';
+      var contrato2=Number(o.contrato)||0;
+      var fPct=contrato2>0?((fTot/contrato2)*100).toFixed(1):null;
+      return'<div class="det-sc" style="border-top:3px solid #059669;background:#f0fdf4;margin-bottom:12px">'+
+        '<div class="det-num" style="color:#059669">'+fM(fTot)+'</div>'+
+        '<div class="det-lbl">🏦 Fundos acumulados'+(fPct?' · <span style="color:#059669">'+fPct+'% do contrato</span>':'')+
+        '</div></div>';
+    })()+
     '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px">'+
       prazoInfo+
       '<div class="det-sc"><div class="det-num">'+fM(budgetEfetivo(o))+'</div><div class="det-lbl">Budget mensal</div></div>'+
       '<div class="det-sc"><div class="det-num" style="color:'+cor+'">'+fM(tot)+'</div><div class="det-lbl">Gasto '+mesLabel(mes)+'<br><span style="font-size:9px;font-family:var(--mono);color:'+cor+'">'+p.toFixed(0)+'% · Saldo '+fM(Math.max(0,budgetEfetivo(o)-tot))+'</span></div></div>'+
       '<div class="det-sc"><div class="det-num">'+fM(totG)+'</div><div class="det-lbl">Total acumulado</div></div>'+
     '</div>'+
-    // row 2 — categorias
+    // row 2 — categorias (excluindo fundos)
     '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:18px">'+
       catSC('despesa',totD,'')+
       catSC('almoco',totAlm,o.b_almoco)+
