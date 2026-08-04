@@ -386,7 +386,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
   <aside class="sidebar">
     <div class="logo">
       <div class="logo-title">SP8 Obras</div>
-      <div class="logo-sub">PRO · GESTÃO COMPLETA v5.3</div>
+      <div class="logo-sub">PRO · GESTÃO COMPLETA v5.5</div>
     </div>
     <div class="nav">
       <div class="nav-lbl">Menu</div>
@@ -409,7 +409,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
       <div class="hdr-title" id="hdr-title">Dashboard</div>
     </div>
     <div class="hdr-right">
-      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v5.3</span>
+      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v5.5</span>
       <span id="user-chip" class="user-avatar-chip" style="display:none">
         <span class="user-avatar-sm" id="user-avatar-letter">?</span>
         <span id="user-nome-chip">—</span>
@@ -1013,8 +1013,8 @@ function nextMonths(n){
   return r;
 }
 function gastosMes(oId,mes){
-  // Exclui Fundos dos gastos (fundos são contabilizados separadamente)
-  return S.lancamentos.filter(function(l){return l.obraId===oId&&l.mes===mes&&l.tipo!=='fundos';});
+  // Exclui Fundos e Imposto dos gastos comuns (contabilizados separadamente)
+  return S.lancamentos.filter(function(l){return l.obraId===oId&&l.mes===mes&&l.tipo!=='fundos'&&l.tipo!=='imposto';});
 }
 function totalMesObra(oId,mes){return gastosMes(oId,mes).reduce(function(a,l){return a+Number(l.valor);},0);}
 function totalObra(oId){return S.lancamentos.filter(function(l){return l.obraId===oId;}).reduce(function(a,l){return a+Number(l.valor);},0);}
@@ -1778,31 +1778,38 @@ function rDetalhe(obraId){
       var mesesComFundo=S.lancamentos.filter(function(l){return l.obraId===o.id&&l.tipo==='fundos';}).length;
       // Lançamento de fundos do mês atual para edição direta
       var lancFundoMes=S.lancamentos.find(function(l){return l.obraId===o.id&&l.tipo==='fundos'&&l.mes===mes;});
+      var iMes=S.lancamentos.filter(function(l){return l.obraId===o.id&&l.tipo==='imposto'&&l.mes===mes;}).reduce(function(a,l){return a+Number(l.valor);},0);
+      var iTot=S.lancamentos.filter(function(l){return l.obraId===o.id&&l.tipo==='imposto';}).reduce(function(a,l){return a+Number(l.valor);},0);
       var btnAlt=lancFundoMes
-        ? '<button class="btn no-print" style="font-size:11px;border-color:#059669;color:#059669" onclick="editarLanc(\''+lancFundoMes.id+'\',function(){rDetalhe(\''+o.id+'\');})">✏️ Editar '+mesLabel(mes)+'</button>'
-        : '<button class="btn no-print btn-primary" style="font-size:11px;background:#059669;border-color:#059669" onclick="showPage(\'lancamentos\')">+ Lançar Fundos</button>';
-      return'<div style="background:#f0fdf4;border:2px solid #86efac;border-radius:var(--r);padding:14px 18px;margin-bottom:14px">'+
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'+
-          '<div style="font-size:11px;color:#059669;font-family:var(--mono);font-weight:600;text-transform:uppercase;letter-spacing:.5px">🏦 Fundos da Obra</div>'+
+        ? '<button class="btn no-print" style="font-size:11px;border-color:#059669;color:#059669" onclick="editarLanc(\''+lancFundoMes.id+'\',function(){rDetalhe(\''+o.id+'\');})">✏️ Editar Fundo '+mesLabel(mes)+'</button>'
+        : '<button class="btn no-print" style="font-size:11px;background:#059669;border-color:#059669;color:#fff" onclick="showPage(\'lancamentos\')">+ Lançar Fundos</button>';
+      return'<div style="background:linear-gradient(135deg,#f0fdf4 60%,#fffbeb);border:2px solid #86efac;border-radius:var(--r);padding:14px 18px;margin-bottom:14px">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
+          '<div style="font-size:11px;color:#059669;font-family:var(--mono);font-weight:600;text-transform:uppercase;letter-spacing:.5px">🏦 Fundos &nbsp;·&nbsp; 🧾 Imposto</div>'+
           btnAlt+
         '</div>'+
-        '<div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">'+
-          '<div>'+
-            '<div style="font-size:10px;color:#6b7280;font-family:var(--mono)">'+mesLabel(mes)+' (mês atual)</div>'+
-            '<div style="font-size:22px;font-weight:700;color:'+(fMes>0?'#059669':'#9ca3af')+';font-family:var(--mono)">'+fM(fMes||0)+'</div>'+
+        '<div style="display:flex;gap:0;flex-wrap:wrap">'+
+          // FUNDOS
+          '<div style="flex:1;min-width:180px;padding-right:20px;border-right:1px solid #86efac;margin-right:20px">'+
+            '<div style="font-size:10px;color:#059669;font-family:var(--mono);font-weight:600;margin-bottom:6px">🏦 Fundos</div>'+
+            '<div style="display:flex;gap:16px">'+
+              '<div><div style="font-size:9px;color:#6b7280;font-family:var(--mono)">'+mesLabel(mes)+'</div>'+
+              '<div style="font-size:18px;font-weight:700;color:'+(fMes>0?'#059669':'#9ca3af')+';font-family:var(--mono)">'+fM(fMes||0)+'</div></div>'+
+              '<div><div style="font-size:9px;color:#6b7280;font-family:var(--mono)">Acumulado ('+mesesComFundo+'m)</div>'+
+              '<div style="font-size:18px;font-weight:700;color:'+(fTot>0?'#059669':'#9ca3af')+';font-family:var(--mono)">'+fM(fTot||0)+(fPct?' <span style="font-size:10px;font-weight:400">('+fPct+'%)</span>':'')+'</div></div>'+
+            '</div>'+
+            (fTot===0?'<div style="font-size:10px;color:#9ca3af;font-style:italic;margin-top:4px">Nenhum fundo lançado ainda.</div>':'')+
           '</div>'+
-          '<div style="width:1px;height:44px;background:#86efac"></div>'+
-          '<div>'+
-            '<div style="font-size:10px;color:#6b7280;font-family:var(--mono)">Total acumulado ('+mesesComFundo+' meses)</div>'+
-            '<div style="font-size:22px;font-weight:700;color:'+(fTot>0?'#059669':'#9ca3af')+';font-family:var(--mono)">'+fM(fTot||0)+'</div>'+
+          // IMPOSTO
+          '<div style="flex:1;min-width:180px">'+
+            '<div style="font-size:10px;color:#b45309;font-family:var(--mono);font-weight:600;margin-bottom:6px">🧾 Previsão Imposto (6%)</div>'+
+            '<div style="display:flex;gap:16px">'+
+              '<div><div style="font-size:9px;color:#6b7280;font-family:var(--mono)">'+mesLabel(mes)+'</div>'+
+              '<div style="font-size:18px;font-weight:700;color:'+(iMes>0?'#b45309':'#9ca3af')+';font-family:var(--mono)">'+fM(iMes||0)+'</div></div>'+
+              '<div><div style="font-size:9px;color:#6b7280;font-family:var(--mono)">Total previsto</div>'+
+              '<div style="font-size:18px;font-weight:700;color:'+(iTot>0?'#b45309':'#9ca3af')+';font-family:var(--mono)">'+fM(iTot||0)+'</div></div>'+
+            '</div>'+
           '</div>'+
-          (fPct?
-            '<div style="width:1px;height:44px;background:#86efac"></div>'+
-            '<div>'+
-              '<div style="font-size:10px;color:#6b7280;font-family:var(--mono)">% do Contrato</div>'+
-              '<div style="font-size:22px;font-weight:700;color:#059669;font-family:var(--mono)">'+fPct+'%</div>'+
-            '</div>':'')+
-          (fTot===0?'<div style="font-size:11px;color:#6b7280;font-style:italic">Nenhum fundo lançado ainda. Use "Lançar Gasto" → tipo 🏦 Fundos com recorrente.</div>':'')+
         '</div>'+
       '</div>';
     })()+
@@ -3039,7 +3046,69 @@ function saveObra(id){
   }
   sv();
   pushObra(id ? findO(id) : dados);
+  // Gera/atualiza lançamentos de Previsão Imposto (6% do budget)
+  gerarImpostoObra(id ? findO(id) : dados);
   closeModal(); renderPage(S.pagina); renderSidebarObras();
+}
+
+// Gera lançamentos mensais de "Previsão Imposto" (6% do budget)
+// do mês atual até o prazo da obra, atualizando se já existirem
+function gerarImpostoObra(o){
+  if(!o||!o.budget||Number(o.budget)<=0) return;
+  var ALIQ = 0.06; // 6%
+  var valorImposto = Number(o.budget) * ALIQ;
+  var mesInicio = mesAtual();
+  var prazo = o.prazo; // YYYY-MM-DD
+
+  // Calcula meses de vigência
+  var meses = [];
+  var m = mesInicio;
+  var limite = prazo ? prazo.substring(0,7) : '';
+  for(var i=0; i<60; i++){
+    meses.push(m);
+    if(limite && m >= limite) break;
+    var p = m.split('-');
+    var yr = parseInt(p[0]); var mo = parseInt(p[1])+1;
+    if(mo>12){mo=1;yr++;}
+    m = yr+'-'+pad(mo);
+  }
+
+  // Remove lançamentos futuros de imposto desta obra (serão recriados)
+  var removidos = [];
+  S.lancamentos = S.lancamentos.filter(function(l){
+    if(l.obraId===o.id && l.tipo==='imposto' && l.mes >= mesInicio){
+      removidos.push(l.id);
+      return false;
+    }
+    return true;
+  });
+  // Remove do Firebase
+  removidos.forEach(function(lid){
+    if(FB) FB.collection('lancamentos').doc(lid).delete().catch(function(){});
+  });
+
+  // Cria novos lançamentos mensais de imposto
+  meses.forEach(function(mes){
+    if(mesFechado(mes)) return; // não lança em mês fechado
+    var dp = mes+'-01';
+    var l = {
+      id: 'imp'+o.id+mes,
+      obraId: o.id,
+      tipo: 'imposto',
+      pgto: 'avista',
+      descricao: 'Previsão Imposto (6%)',
+      resp: '',
+      valor: valorImposto,
+      data: dp,
+      mes: mes,
+      parcela: 0,
+      total_parcelas: 0,
+      auto: true
+    };
+    S.lancamentos.push(l);
+    if(FB) FB.collection('lancamentos').doc(l.id).set(l).catch(function(){});
+  });
+  sv();
 }
 
 function delObra(id){
@@ -3051,6 +3120,7 @@ function delObra(id){
 
 var CATEGORIAS={
   fundos:{label:'Fundos',icon:'🏦',cor:'#059669',bg:'#f0fdf4',border:'#86efac'},
+  imposto:{label:'Previsão Imposto',icon:'🧾',cor:'#b45309',bg:'#fffbeb',border:'#fcd34d'},
   despesa:{label:'Despesa',icon:'💼',cor:'#1d4ed8',bg:'#eff6ff',border:'#bfdbfe'},
   almoco:{label:'Almoço',icon:'🍽',cor:'#b45309',bg:'#fffbeb',border:'#fcd34d'},
   hospedagem:{label:'Hospedagem',icon:'🏨',cor:'#0e7490',bg:'#ecfeff',border:'#a5f3fc'},
