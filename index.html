@@ -633,7 +633,15 @@ select.fi option{background:var(--bg2);color:var(--text)}
           </div>
           <input type="file" id="file-imp" accept=".json" style="display:none">
         </div>
-        <div class="fcard" style="margin-top:14px;border-color:#86efac">
+        <div class="fcard" style="margin-top:14px">
+          <div class="ftitle">🔔 Notificações</div>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">Receba uma notificação a cada lançamento registrado (funciona no Android com o app instalado).</p>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn" id="cfg-notif-ativar" style="border-color:var(--accent);color:var(--accent)">🔔 Ativar notificações</button>
+            <button class="btn" id="cfg-notif-desativar">🔕 Desativar</button>
+            <span id="cfg-notif-status" style="font-size:12px;font-family:var(--mono);color:var(--text3)"></span>
+          </div>
+        </div>
           <div class="ftitle" style="color:#059669">🏦 Correção de Fundos</div>
           <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">
             Se você lançou os Fundos com o tipo <strong>Despesa</strong> antes de o tipo <strong>Fundos</strong> existir no sistema, clique abaixo para corrigir automaticamente todos os lançamentos que contenham "fundo" na descrição.
@@ -904,8 +912,42 @@ function ativarListeners(){
     if(S.pagina==='relatorio') renderRelatorioObras();
     syncChip('ok','Tempo real ativo');
   },function(e){ syncChip('erro','Listener: '+e.message); });
+  // Guarda IDs já conhecidos antes da primeira carga
+  var _primeiraCarregada = false;
+  var _idsConhecidos = {};
+
   _unsubLancs = FB.collection('lancamentos').onSnapshot(function(snap){
-    S.lancamentos = snap.docs.map(function(d){return d.data();});
+    var novos = [];
+    snap.docChanges().forEach(function(change){
+      if(change.type === 'added' && _primeiraCarregada){
+        var l = change.doc.data();
+        // Notifica apenas se não foi criado por este dispositivo (não está em S.lancamentos ainda)
+        if(!_idsConhecidos[l.id]){
+          novos.push(l);
+        }
+      }
+    });
+
+    S.lancamentos = snap.docs.map(function(d){
+      var l = d.data();
+      _idsConhecidos[l.id] = true;
+      return l;
+    });
+
+    _primeiraCarregada = true;
+
+    // Dispara notificação para cada lançamento novo de outro dispositivo
+    novos.forEach(function(l){
+      var o = findO(l.obraId);
+      var cat = CATEGORIAS[l.tipo] || CATEGORIAS.despesa;
+      var resp = l.resp ? ' · '+l.resp : '';
+      enviarNotif(
+        cat.icon+' Novo lançamento — '+(o ? o.nome : 'obra'),
+        cat.label+' · '+fM(l.valor)+(l.descricao ? ' · '+l.descricao : '')+resp,
+        'icon-192.png'
+      );
+    });
+
     sv(); renderSidebarObras();
     if(S.det) renderPage('detalhe',S.det);
     else if(['dashboard','lancamentos','historico','relatorio'].indexOf(S.pagina)>-1) renderPage(S.pagina);
@@ -1355,7 +1397,12 @@ function rDashboard(){
         var fMes=totalFundosMes(o.id,mes);
         var fTot=totalFundosObra(o.id);
         if(!fTot&&!fMes)return'';
-        var fPct=contrato>0&&fTot>0?((fTot/contrato)*100).toFixed(1):null;
+        var contratoO=Number(o.contrato)||0;
+        var fPct=contratoO>0&&fTot>0?((fTot/contratoO)*100).toFixed(1):null;
+        var lancFundoMes=S.lancamentos.find(function(l){return l.obraId===o.id&&l.tipo==='fundos'&&l.mes===mes;});
+        var btnEdit=lancFundoMes
+          ? '<div style="margin-top:6px"><button class="btn" style="font-size:10px;padding:2px 8px;border-color:#059669;color:#059669" onclick="event.stopPropagation();editarLanc(\''+lancFundoMes.id+'\')">✏️ Editar fundo '+mesLabel(mes)+'</button></div>'
+          : '';
         return'<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:var(--rsm);padding:8px 12px;margin-bottom:8px">'+
           '<div style="font-size:9px;color:#059669;font-family:var(--mono);font-weight:600;text-transform:uppercase;margin-bottom:5px">🏦 Fundos</div>'+
           '<div style="display:flex;justify-content:space-between;align-items:baseline">'+
@@ -1363,7 +1410,7 @@ function rDashboard(){
             '<div style="font-size:14px;font-weight:700;color:#059669;font-family:var(--mono)">'+fM(fMes||0)+'</div></div>'+
             '<div style="text-align:right"><div style="font-size:10px;color:#6b7280;font-family:var(--mono)">Acumulado</div>'+
             '<div style="font-size:14px;font-weight:700;color:#059669;font-family:var(--mono)">'+fM(fTot)+(fPct?' <span style="font-size:10px;font-weight:400">('+fPct+'%)</span>':'')+'</div></div>'+
-          '</div></div>';
+          '</div>'+btnEdit+'</div>';
       })()+
       '<div class="oc-rows">'+
         '<div class="oc-row"><span class="oc-rl">Budget mensal</span><span class="oc-rv">'+fM(budgetEfetivo(o))+'</span></div>'+
@@ -1493,13 +1540,14 @@ function rObraDashboard(obraId){
 
   var nlc=S.lancamentos.filter(function(l){return l.obraId===o.id;}).length;
   // Cards de resumo
+  var contratoVal=Number(o.contrato)||0;
   var fundosTot=totalFundosObra(o.id);
-  var fundosPct=contrato>0&&fundosTot>0?((fundosTot/contrato)*100).toFixed(1):null;
+  var fundosPct=contratoVal>0&&fundosTot>0?((fundosTot/contratoVal)*100).toFixed(1):null;
   var fundosCard=fundosTot>0?
     '<div class="fcard" style="padding:14px 16px;border:2px solid #86efac;background:#f0fdf4">'+
       '<div style="font-size:10px;color:#059669;font-family:var(--mono);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">🏦 Fundos acumulados</div>'+
       '<div style="font-size:20px;font-weight:700;color:#059669;font-family:var(--mono)">'+fM(fundosTot)+'</div>'+
-      (fundosPct?'<div style="font-size:11px;color:#6b7280;font-family:var(--mono);margin-top:3px">'+fundosPct+'% do contrato ('+fM(contrato)+')</div>':'')+
+      (fundosPct?'<div style="font-size:11px;color:#6b7280;font-family:var(--mono);margin-top:3px">'+fundosPct+'% do contrato ('+fM(contratoVal)+')</div>':'')+
     '</div>':'';
 
   h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:22px">'+
@@ -1927,8 +1975,67 @@ function atualizarListaLancs(){
 }
 
 // ============================================================
-// MODO OFFLINE — fila de sincronização
+// NOTIFICAÇÕES — Web Notifications API
 // ============================================================
+var NOTIF_KEY = 'obras_notif_ativa';
+
+function notifAtiva(){
+  return localStorage.getItem(NOTIF_KEY)==='true';
+}
+
+function pedirPermissaoNotif(callback){
+  if(!('Notification' in window)){
+    alert('Este navegador não suporta notificações.');
+    return;
+  }
+  if(Notification.permission==='granted'){
+    localStorage.setItem(NOTIF_KEY,'true');
+    if(callback) callback(true);
+    return;
+  }
+  if(Notification.permission==='denied'){
+    alert('Notificações bloqueadas.\n\nPara ativar: Configurações do Chrome → Configurações do site → Notificações → Permitir para este site.');
+    return;
+  }
+  Notification.requestPermission().then(function(result){
+    if(result==='granted'){
+      localStorage.setItem(NOTIF_KEY,'true');
+      enviarNotif('SP8 Obras Manager','✅ Notificações ativadas com sucesso!','icon-192.png');
+      if(callback) callback(true);
+    } else {
+      localStorage.setItem(NOTIF_KEY,'false');
+      if(callback) callback(false);
+    }
+  });
+}
+
+function desativarNotif(){
+  localStorage.setItem(NOTIF_KEY,'false');
+}
+
+function enviarNotif(titulo, corpo, icon){
+  if(!notifAtiva()) return;
+  if(!('Notification' in window)) return;
+  if(Notification.permission!=='granted') return;
+  try{
+    // Tenta via Service Worker (melhor no mobile)
+    if(navigator.serviceWorker&&navigator.serviceWorker.controller){
+      navigator.serviceWorker.ready.then(function(reg){
+        reg.showNotification(titulo,{
+          body:corpo,
+          icon:icon||'icon-192.png',
+          badge:'icon-192.png',
+          vibrate:[200,100,200],
+          tag:'obras-lanc',
+          renotify:true
+        });
+      });
+    } else {
+      new Notification(titulo,{body:corpo,icon:icon||'icon-192.png'});
+    }
+  }catch(e){}
+}
+
 var OFFLINE_QUEUE_KEY = 'obras_offline_queue';
 var _isOnline = navigator.onLine;
 
@@ -2713,6 +2820,25 @@ function rConfig(){
       msg.textContent='⚠ Não conectado. Clique em "Testar conexão".';
     }
   }
+  // Status notificações
+  var notifStatus=document.getElementById('cfg-notif-status');
+  if(notifStatus){
+    var perm=('Notification' in window)?Notification.permission:'não suportado';
+    var ativa=notifAtiva();
+    notifStatus.textContent='Status: '+(ativa&&perm==='granted'?'✅ Ativas':'❌ Inativas')+' · Permissão: '+perm;
+  }
+  var ativarBtn=document.getElementById('cfg-notif-ativar');
+  if(ativarBtn) ativarBtn.onclick=function(){
+    pedirPermissaoNotif(function(ok){
+      rConfig();
+    });
+  };
+  var desativarBtn=document.getElementById('cfg-notif-desativar');
+  if(desativarBtn) desativarBtn.onclick=function(){
+    desativarNotif();
+    rConfig();
+  };
+
   var fixBtn=document.getElementById('cfg-fix-fundos');
   if(fixBtn){
     fixBtn.onclick=function(){
@@ -3133,6 +3259,16 @@ function saveLanc(){
     document.getElementById('l-recorrente-wrap').style.display='none';
   }
   sv();
+  // Marca ID como conhecido (criado por este dispositivo)
+  if(_idsConhecidos) criarLancamentosRecorrentes && S.lancamentos.forEach(function(l){ _idsConhecidos[l.id]=true; });
+  // Notificação de confirmação para quem lançou
+  var obraNotif=findO(obraId);
+  var tipoNotif=CATEGORIAS[tipo]?CATEGORIAS[tipo].icon+' '+CATEGORIAS[tipo].label:'Gasto';
+  enviarNotif(
+    '✅ Lançamento registrado — '+(obraNotif?obraNotif.nome:''),
+    tipoNotif+' · '+fM(valor)+(desc?' · '+desc:''),
+    'icon-192.png'
+  );
   document.getElementById('l-desc').value='';document.getElementById('l-resp').value='';
   document.getElementById('l-valor').value='';document.getElementById('l-data').value=hoje();
   document.getElementById('l-preview').innerHTML='';
