@@ -386,7 +386,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
   <aside class="sidebar">
     <div class="logo">
       <div class="logo-title">SP8 Obras</div>
-      <div class="logo-sub">PRO · GESTÃO COMPLETA v5.7</div>
+      <div class="logo-sub">PRO · GESTÃO COMPLETA v5.8</div>
     </div>
     <div class="nav">
       <div class="nav-lbl">Menu</div>
@@ -409,7 +409,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
       <div class="hdr-title" id="hdr-title">Dashboard</div>
     </div>
     <div class="hdr-right">
-      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v5.7</span>
+      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v5.8</span>
       <span id="user-chip" class="user-avatar-chip" style="display:none">
         <span class="user-avatar-sm" id="user-avatar-letter">?</span>
         <span id="user-nome-chip">—</span>
@@ -3004,7 +3004,9 @@ function modalLanc(obraId){
     '<div class="fg"><label class="flbl">Categoria</label><select class="fi" id="ml-tipo"><option value="fundos">🏦 Fundos</option><option value="despesa">💼 Despesa / Serviço</option><option value="almoco">🍽 Almoço / Alimentação</option><option value="hospedagem">🏨 Hospedagem</option><option value="combustivel">⛽ Combustível</option><option value="prestador">🧑‍🔧 Prestador</option><option value="peca">🔩 Peça / Material</option></select></div></div>'+
     '<div class="fg"><label class="flbl">Descrição</label><input class="fi" id="ml-desc" placeholder="Ex: Câmeras externas – 6un"></div>'+
     '<div class="fl"><div class="fg"><label class="flbl">Responsável</label><input class="fi" id="ml-resp" placeholder="Opcional"></div>'+
-    '<div class="fg"><label class="flbl">Forma de Pagamento</label><select class="fi" id="ml-pgto"><option value="avista">💵 À vista</option><option value="30d">📅 Prazo 30 dias</option><option value="cartao">💳 Cartão</option><option value="3x">📆 3x</option><option value="5x">📆 5x</option></select></div></div>'+
+    '<div class="fg"><label class="flbl">Forma de Pagamento</label><select class="fi" id="ml-pgto"><option value="avista">💵 À vista</option><option value="30d">📅 Prazo</option><option value="cartao">💳 Cartão</option><option value="3x">📆 3x</option><option value="5x">📆 5x</option></select></div></div>'+
+    '<div id="ml-prazo-wrap" style="display:none" class="fg"><label class="flbl">Data do vencimento</label><input class="fi" id="ml-prazo-data" type="date"></div>'+
+    '<div id="ml-cartao-wrap" style="display:none" class="fl"><div class="fg"><label class="flbl">Nº parcelas cartão</label><select class="fi" id="ml-cartao-parcelas"><option value="1">1x</option><option value="2">2x</option><option value="3">3x</option><option value="4">4x</option><option value="5">5x</option></select></div><div class="fg"><label class="flbl">Data 1ª fatura</label><input class="fi" id="ml-cartao-data" type="date"></div></div>'+
     '<div class="fl"><div class="fg"><label class="flbl">Valor Total (R$)</label><input class="fi" id="ml-valor" type="number" step="0.01" min="0"></div>'+
     '<div class="fg"><label class="flbl">Data</label><input class="fi" id="ml-data" type="date" value="'+hoje()+'"></div></div>'+
     '<div id="ml-preview"></div>'+
@@ -3012,8 +3014,14 @@ function modalLanc(obraId){
   );
   document.getElementById('ml-cancel').addEventListener('click',closeModal);
   document.getElementById('ml-save').addEventListener('click',saveLancModal);
-  document.getElementById('ml-valor').addEventListener('input',function(){atualizarPreviewModal();});
-  document.getElementById('ml-pgto').addEventListener('change',function(){atualizarPreviewModal();});
+  document.getElementById('ml-valor').addEventListener('input',atualizarPreviewModal);
+  document.getElementById('ml-data').addEventListener('change',atualizarPreviewModal);
+  document.getElementById('ml-pgto').addEventListener('change',function(){
+    var t=this.value;
+    document.getElementById('ml-prazo-wrap').style.display=t==='30d'?'block':'none';
+    document.getElementById('ml-cartao-wrap').style.display=t==='cartao'?'flex':'none';
+    atualizarPreviewModal();
+  });
   document.getElementById('ml-desc').focus();
 }
 
@@ -3021,18 +3029,25 @@ function atualizarPreviewModal(){
   var tipo=document.getElementById('ml-pgto').value;
   var valor=parseFloat(document.getElementById('ml-valor').value)||0;
   var dataVal=document.getElementById('ml-data').value||hoje();
-  var n=tipo==='avista'?1:tipo==='30d'?1:tipo==='cartao'?1:tipo==='3x'?3:5;
+  var cartaoN=parseInt((document.getElementById('ml-cartao-parcelas')||{value:'1'}).value)||1;
+  var n=tipo==='avista'?1:tipo==='30d'?1:tipo==='cartao'?cartaoN:tipo==='3x'?3:5;
   if(tipo==='avista'||!valor){document.getElementById('ml-preview').innerHTML='';return;}
   var parcVal=valor/n;
   var rows='';
   if(tipo==='30d'){
-    rows='<div class="parc-row"><span>📅 Prazo 30 dias</span><span>'+fM(valor)+'</span></div>';
+    var prazoData=(document.getElementById('ml-prazo-data')||{}).value||addDias(dataVal,30).data;
+    rows='<div class="parc-row"><span>📅 Vencimento: <strong>'+fD(prazoData)+'</strong></span><span style="font-size:10px;color:var(--text3);font-family:var(--mono)">'+mesLabel(prazoData.substring(0,7))+'</span><span>'+fM(valor)+'</span></div>';
   } else if(tipo==='cartao'){
-    rows='<div class="parc-row"><span>💳 Cartão de crédito</span><span>'+fM(valor)+'</span></div>';
+    var cartaoData=(document.getElementById('ml-cartao-data')||{}).value||addDias(dataVal,30).data;
+    for(var i=0;i<cartaoN;i++){
+      var r=i===0?{data:cartaoData,mes:cartaoData.substring(0,7)}:addDias(cartaoData,i*30);
+      rows+='<div class="parc-row"><span>💳 '+(i+1)+' de '+cartaoN+' · <strong>'+fD(r.data)+'</strong></span><span style="font-size:10px;color:var(--text3);font-family:var(--mono)">'+mesLabel(r.mes)+'</span><span>'+fM(parcVal)+'</span></div>';
+    }
+    if(cartaoN>1) rows+='<div class="parc-row" style="font-weight:600"><span>Total</span><span>'+fM(valor)+'</span></div>';
   } else {
     for(var i=0;i<n;i++){
-      var r=addDias(dataVal, i*30);
-      rows+='<div class="parc-row"><span>'+i+1+'/'+n+' · '+fD(r.data)+' ('+mesLabel(r.mes)+')</span><span>'+fM(parcVal)+'</span></div>';
+      var r=addDias(dataVal,i*30);
+      rows+='<div class="parc-row"><span>'+(i+1)+' de '+n+' · <strong>'+fD(r.data)+'</strong></span><span style="font-size:10px;color:var(--text3);font-family:var(--mono)">'+mesLabel(r.mes)+'</span><span>'+fM(parcVal)+'</span></div>';
     }
     rows+='<div class="parc-row" style="font-weight:600"><span>Total</span><span>'+fM(valor)+'</span></div>';
   }
@@ -3259,7 +3274,9 @@ function criarLancamentos(obraId,tipo,desc,resp,valor,data,pgto,nparcelas,pgtoDa
 
   var parcelas=[];
   if(pgto==='30d'){
+    // Para prazo: usa pgtoData (campo l-prazo-data), ignora parcDatas
     var venc=pgtoData||addDias(data,30).data;
+    if(!venc||venc.length<7){ alert('Informe a data de vencimento'); return; }
     parcelas.push({data:venc, mes:venc.substring(0,7)});
   } else if(pgto==='cartao'){
     var fatData=pgtoData||addDias(data,30).data;
@@ -3312,18 +3329,39 @@ function saveLanc(){
     ? (document.getElementById('l-cartao-parcelas')||{value:'1'}).value
     : document.getElementById('l-nparcelas').value;
   var pgtoData='';
-  if(pgto==='30d') pgtoData=(document.getElementById('l-prazo-data')||{}).value||addDias(data,30).data;
-  if(pgto==='cartao') pgtoData=(document.getElementById('l-cartao-data')||{}).value||addDias(data,30).data;
-  // Coleta datas editadas pelo usuário nas parcelas
-  var parcDatas=[];
-  var idx=0;
-  while(document.getElementById('parc-date-'+idx)){
-    parcDatas.push(document.getElementById('parc-date-'+idx).value);
-    idx++;
+  if(pgto==='30d'){
+    // Prazo: lê do campo l-prazo-data OU do parc-date-0 no preview
+    var prazoEl=document.getElementById('l-prazo-data');
+    var parcEl=document.getElementById('parc-date-0');
+    pgtoData=(prazoEl&&prazoEl.value?prazoEl.value:'')
+           ||(parcEl&&parcEl.value?parcEl.value:'')
+           ||addDias(data,30).data;
+  }
+  if(pgto==='cartao'){
+    pgtoData=(document.getElementById('l-cartao-data')||{}).value||addDias(data,30).data;
+  }
+  // Coleta datas editadas para parcelados (não para 30d nem avista)
+  var parcDatas=null;
+  if(pgto!=='30d'&&pgto!=='avista'&&pgto!=='cartao'){
+    parcDatas=[];
+    var idx=0;
+    while(document.getElementById('parc-date-'+idx)){
+      parcDatas.push(document.getElementById('parc-date-'+idx).value);
+      idx++;
+    }
+    if(!parcDatas.length) parcDatas=null;
+  } else if(pgto==='cartao'){
+    parcDatas=[];
+    var idx=0;
+    while(document.getElementById('parc-date-'+idx)){
+      parcDatas.push(document.getElementById('parc-date-'+idx).value);
+      idx++;
+    }
+    if(!parcDatas.length) parcDatas=null;
   }
   if(!obraId){alert('Selecione uma obra');return;}
   if(!desc||!valor||valor<=0){alert('Preencha descrição e valor');return;}
-  criarLancamentos(obraId,tipo,desc,resp,valor,data,pgto,np,pgtoData,parcDatas.length?parcDatas:null);
+  criarLancamentos(obraId,tipo,desc,resp,valor,data,pgto,np,pgtoData,parcDatas);
   // Lançamento recorrente
   var recChk=document.getElementById('l-recorrente');
   if(recChk&&recChk.checked){
@@ -3378,8 +3416,13 @@ function saveLancModal(){
   var valor=parseMoney(document.getElementById('ml-valor').value);
   var data=document.getElementById('ml-data').value;
   var pgto=document.getElementById('ml-pgto').value;
+  var cartaoN=(document.getElementById('ml-cartao-parcelas')||{value:'1'}).value;
+  var np=pgto==='cartao'?cartaoN:pgto==='3x'?3:pgto==='5x'?5:1;
+  var pgtoData='';
+  if(pgto==='30d') pgtoData=(document.getElementById('ml-prazo-data')||{}).value||addDias(data,30).data;
+  if(pgto==='cartao') pgtoData=(document.getElementById('ml-cartao-data')||{}).value||addDias(data,30).data;
   if(!desc||!valor||Number(valor)<=0){alert('Preencha descrição e valor');return;}
-  criarLancamentos(obraId,tipo,desc,resp,valor,data,pgto,2);
+  criarLancamentos(obraId,tipo,desc,resp,valor,data,pgto,np,pgtoData,null);
   sv();closeModal();checkAlerta(obraId,data.substring(0,7));
   renderPage(S.pagina);renderSidebarObras();
 }
