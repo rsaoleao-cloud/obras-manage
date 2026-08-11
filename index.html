@@ -386,7 +386,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
   <aside class="sidebar">
     <div class="logo">
       <div class="logo-title">SP8 Obras</div>
-      <div class="logo-sub">PRO · GESTÃO COMPLETA v5.8</div>
+      <div class="logo-sub">PRO · GESTÃO COMPLETA v5.9</div>
     </div>
     <div class="nav">
       <div class="nav-lbl">Menu</div>
@@ -409,7 +409,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
       <div class="hdr-title" id="hdr-title">Dashboard</div>
     </div>
     <div class="hdr-right">
-      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v5.8</span>
+      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v5.9</span>
       <span id="user-chip" class="user-avatar-chip" style="display:none">
         <span class="user-avatar-sm" id="user-avatar-letter">?</span>
         <span id="user-nome-chip">—</span>
@@ -671,16 +671,16 @@ select.fi option{background:var(--bg2);color:var(--text)}
 <!-- NAV INFERIOR MOBILE -->
 <nav class="mobile-nav">
   <div class="mobile-nav-items">
-    <button class="mobile-nav-btn active" id="mnav-dashboard"><span class="mn-icon">📊</span>Dashboard</button>
     <button class="mobile-nav-btn" id="mnav-obras"><span class="mn-icon">🏗️</span>Obras</button>
-    <button class="mobile-nav-btn" id="mnav-lancamentos"><span class="mn-icon">📝</span>Lançar</button>
-    <button class="mobile-nav-btn" id="mnav-historico"><span class="mn-icon">🗂️</span>Histórico</button>
-    <button class="mobile-nav-btn" id="mnav-relatorio"><span class="mn-icon">📋</span>Relatório</button>
+    <button class="mobile-nav-btn active" id="mnav-lancamentos"><span class="mn-icon">📝</span>Lançar</button>
     <button class="mobile-nav-btn" id="mnav-mais"><span class="mn-icon">⋯</span>Mais</button>
   </div>
 
   <!-- MENU "MAIS" mobile -->
   <div id="mnav-mais-menu" style="display:none;position:fixed;bottom:62px;left:0;right:0;background:var(--card);border-top:1px solid var(--border);box-shadow:0 -4px 16px rgba(0,0,0,.12);z-index:101;padding:8px 0">
+    <button class="mnav-mais-item" data-page="dashboard"><span>📊</span> Dashboard</button>
+    <button class="mnav-mais-item" data-page="historico"><span>🗂️</span> Histórico</button>
+    <button class="mnav-mais-item" data-page="relatorio"><span>📋</span> Relatório</button>
     <button class="mnav-mais-item" data-page="fechamentos"><span>🔒</span> Fechamentos</button>
     <button class="mnav-mais-item" data-page="excluidos"><span>🗑️</span> Exclusões</button>
     <button class="mnav-mais-item" data-page="config"><span>⚙️</span> Configurações</button>
@@ -1183,7 +1183,10 @@ function rDashboard(){
     '<div class="sc"><div class="sc-num">'+S.obras.length+'</div><div class="sc-lbl">Obras ativas</div><div class="sc-sub">'+S.lancamentos.length+' lançamentos</div></div>'+
     '<div class="sc"><div class="sc-num" style="font-size:14px">'+fM(totalComp)+'</div><div class="sc-lbl">Comprometido '+mesLabel(mes)+'</div><div class="sc-sub">Budget total: '+fM(totalBudget)+'</div></div>'+
     '<div class="sc"><div class="sc-num" style="font-size:14px;color:'+(saldoBudget<0?'#dc2626':'#16a34a')+'">'+fM(saldoBudget)+'</div><div class="sc-lbl">Saldo disponível</div><div class="sc-sub">Todos os projetos</div></div>'+
-    '<div class="sc"><div class="sc-num" style="color:'+(alertCount>0?'#d97706':'#16a34a')+'">'+alertCount+'</div><div class="sc-lbl">Alertas budget</div><div class="sc-sub">'+prazoCount+' prazos próximos</div></div>'+
+    '<div class="sc"><div class="sc-num" style="color:'+(alertCount>0?'#d97706':'#16a34a')+'">'+alertCount+'</div>'+
+    '<div class="sc-lbl">Obras c/ alerta</div>'+
+    '<div class="sc-sub" title="Obras que atingiram 70%, 90% ou 100% do budget este mês">≥70% budget '+mesLabel(mes)+'</div>'+
+    '<div class="sc-sub">'+prazoCount+' prazo'+(prazoCount!==1?'s':'')+' ≤30 dias</div></div>'+
     '<div class="sc"><div class="sc-num" style="font-size:14px">'+fM(totalGasto)+'</div><div class="sc-lbl">Gasto total acumulado</div><div class="sc-sub">Contrato total: '+fM(totalContrato)+'</div></div>';
 
   // Alertas
@@ -1893,10 +1896,16 @@ function atualizarListaLancs(){
   var obraId=selEl?selEl.value:'';
   var mes=mesAtual();
 
-  // Filtra pela obra selecionada (ou todos se nenhuma)
+  // Filtra pela obra selecionada — exclui automáticos (imposto, fundos) e recorrentes da lista
+  function isVisivel(l){
+    if(l.tipo==='imposto') return false; // auto-gerado
+    if(l.auto===true) return false;      // auto-gerado
+    return true;
+  }
+
   var base=obraId
-    ? S.lancamentos.filter(function(l){return l.obraId===obraId;})
-    : S.lancamentos;
+    ? S.lancamentos.filter(function(l){return l.obraId===obraId && isVisivel(l);})
+    : S.lancamentos.filter(isVisivel);
 
   var lancsDoMes=base.filter(function(l){return l.mes===mes;});
 
@@ -3878,7 +3887,7 @@ var dn=new Date();
 var dias=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 document.getElementById('date-chip').textContent=dias[dn.getDay()]+', '+fD(hoje());
 
-var mnavIds=['dashboard','obras','lancamentos','historico','relatorio'];
+var mnavIds=['obras','lancamentos'];
 mnavIds.forEach(function(p){
   var btn=document.getElementById('mnav-'+p);
   if(btn){
