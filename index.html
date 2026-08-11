@@ -386,7 +386,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
   <aside class="sidebar">
     <div class="logo">
       <div class="logo-title">SP8 Obras</div>
-      <div class="logo-sub">PRO · GESTÃO COMPLETA v6.2</div>
+      <div class="logo-sub">PRO · GESTÃO COMPLETA v6.3</div>
     </div>
     <div class="nav">
       <div class="nav-lbl">Menu</div>
@@ -409,7 +409,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
       <div class="hdr-title" id="hdr-title">Dashboard</div>
     </div>
     <div class="hdr-right">
-      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v6.2</span>
+      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v6.3</span>
       <span id="user-chip" class="user-avatar-chip" style="display:none">
         <span class="user-avatar-sm" id="user-avatar-letter">?</span>
         <span id="user-nome-chip">—</span>
@@ -1457,26 +1457,46 @@ function rDashboard(){
     dashLancsEl.innerHTML='';
     return;
   }
-  dashLancsLbl.textContent='Lançamentos recentes — duplo clique para excluir';
-  var lRows=recLancs.map(function(l){
-    var o2=findO(l.obraId);
-    var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+' de '+l.total_parcelas+'</span>':l.pgto==='30d'?'<span class="badge" style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc">📅 30 dias</span>':l.pgto==='cartao'?'<span class="badge" style="background:#faf5ff;color:#7c3aed;border:1px solid #ddd6fe">💳 Cartão</span>':l.pgto==='avista'?'<span style="font-size:10px;color:var(--text4)">💵 À vista</span>':'';
-    return'<tr class="dash-lanc-row" data-id="'+l.id+'" title="Duplo clique para excluir" style="-webkit-user-select:none;user-select:none;cursor:pointer">'+
-      '<td>'+fD(l.data)+'</td>'+
-      '<td>'+(o2?o2.nome:'—')+'</td>'+
-      '<td>'+l.descricao+'</td>'+
-      '<td>'+(l.resp||'—')+'</td>'+
-      '<td>'+catBadge(l.tipo)+'</td>'+
-      '<td>'+pb+'</td>'+
-      '<td style="font-family:var(--mono);text-align:right;font-weight:600">'+fM(l.valor)+'</td>'+
-    '</tr>';
-  }).join('');
-  dashLancsEl.innerHTML=
-    '<div class="tw"><table>'+
-      '<thead><tr><th>Data</th><th>Obra</th><th>Descrição</th><th>Resp.</th><th>Tipo</th><th>Pgto</th><th style="text-align:right">Valor</th></tr></thead>'+
-      '<tbody>'+lRows+'</tbody>'+
-    '</table></div>'+
-    '<div style="font-size:10px;color:var(--text4);font-family:var(--mono);margin-top:6px;text-align:center">'+
+  dashLancsLbl.textContent='Lançamentos recentes por obra — duplo clique para excluir';
+
+  // Agrupa por obra
+  var porObra={};
+  recLancs.forEach(function(l){
+    if(!porObra[l.obraId]) porObra[l.obraId]=[];
+    porObra[l.obraId].push(l);
+  });
+
+  var html='';
+  S.obras.forEach(function(o){
+    var lancsObra=porObra[o.id];
+    if(!lancsObra||!lancsObra.length) return;
+    var totObra=lancsObra.reduce(function(a,l){return a+Number(l.valor);},0);
+    var lRows=lancsObra.map(function(l){
+      var pb=l.parcela?'<span class="badge b-parcela">'+l.parcela+' de '+l.total_parcelas+'</span>':l.pgto==='30d'?'<span class="badge" style="background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc">📅 30 dias</span>':l.pgto==='cartao'?'<span class="badge" style="background:#faf5ff;color:#7c3aed;border:1px solid #ddd6fe">💳 Cartão</span>':l.pgto==='avista'?'<span style="font-size:10px;color:var(--text4)">💵 À vista</span>':'';
+      return'<tr class="dash-lanc-row" data-id="'+l.id+'" title="Duplo clique para excluir" style="-webkit-user-select:none;user-select:none;cursor:pointer">'+
+        '<td style="white-space:nowrap">'+fD(l.data)+'</td>'+
+        '<td>'+l.descricao+'</td>'+
+        '<td>'+(l.resp||'—')+'</td>'+
+        '<td>'+catBadge(l.tipo)+'</td>'+
+        '<td>'+pb+'</td>'+
+        '<td style="font-family:var(--mono);text-align:right;font-weight:600">'+fM(l.valor)+'</td>'+
+      '</tr>';
+    }).join('');
+    html+=
+      '<div class="fcard" style="margin-bottom:12px;padding:0;overflow:hidden">'+
+        '<div style="background:var(--bg3);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)">'+
+          '<div style="font-family:var(--serif);font-size:15px;font-weight:700">'+o.nome+'</div>'+
+          '<div style="font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:600">'+fM(totObra)+' &nbsp;<span style="font-size:10px;color:var(--text3)">'+lancsObra.length+' lançamento'+(lancsObra.length!==1?'s':'')+'</span></div>'+
+        '</div>'+
+        '<div class="tw" style="margin:0"><table>'+
+          '<thead><tr><th>Data</th><th>Descrição</th><th>Resp.</th><th>Tipo</th><th>Pgto</th><th style="text-align:right">Valor</th></tr></thead>'+
+          '<tbody>'+lRows+'</tbody>'+
+        '</table></div>'+
+      '</div>';
+  });
+
+  dashLancsEl.innerHTML=html+
+    '<div style="font-size:10px;color:var(--text4);font-family:var(--mono);margin-top:4px;text-align:center">'+
       '📱 Mobile: pressione e segure &nbsp;·&nbsp; 🖥️ Desktop: duplo clique'+
     '</div>';
 
