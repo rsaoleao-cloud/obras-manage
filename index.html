@@ -386,7 +386,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
   <aside class="sidebar">
     <div class="logo">
       <div class="logo-title">SP8 Obras</div>
-      <div class="logo-sub">PRO · GESTÃO COMPLETA v5.9</div>
+      <div class="logo-sub">PRO · GESTÃO COMPLETA v6.0</div>
     </div>
     <div class="nav">
       <div class="nav-lbl">Menu</div>
@@ -409,7 +409,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
       <div class="hdr-title" id="hdr-title">Dashboard</div>
     </div>
     <div class="hdr-right">
-      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v5.9</span>
+      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v6.0</span>
       <span id="user-chip" class="user-avatar-chip" style="display:none">
         <span class="user-avatar-sm" id="user-avatar-letter">?</span>
         <span id="user-nome-chip">—</span>
@@ -1441,8 +1441,13 @@ function rDashboard(){
     c.addEventListener('click',function(){showPage('obra-dashboard',this.dataset.id);});
   });
 
-  // ---- LANÇAMENTOS RECENTES ----
-  var recLancs=S.lancamentos.slice().sort(function(a,b){return b.data.localeCompare(a.data);}).slice(0,20);
+  // ---- LANÇAMENTOS RECENTES (apenas gastos reais, sem automáticos) ----
+  var recLancs=S.lancamentos.filter(function(l){
+    if(l.tipo==='imposto') return false;
+    if(l.tipo==='fundos') return false;
+    if(l.auto===true) return false;
+    return true;
+  }).slice().sort(function(a,b){return b.data.localeCompare(a.data);}).slice(0,20);
   var dashLancsEl=document.getElementById('dash-lancs');
   var dashLancsLbl=document.getElementById('dash-lancs-lbl');
   if(!recLancs.length){
@@ -2403,6 +2408,9 @@ function filtrarHistorico(){
   var busca = (document.getElementById('h-busca').value||'').trim().toLowerCase();
 
   var lancs = S.lancamentos.filter(function(l){
+    if(l.tipo==='imposto') return false;
+    if(l.tipo==='fundos') return false;
+    if(l.auto===true) return false;
     if(obra  && l.obraId!==obra) return false;
     if(tipo  && l.tipo!==tipo)   return false;
     if(de    && l.data<de)       return false;
