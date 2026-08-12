@@ -1,4 +1,4 @@
-var CACHE = 'obras-manager-v6-6';
+var CACHE = 'obras-manager-v6-7';
 var ASSETS = [
   './',
   './index.html'
