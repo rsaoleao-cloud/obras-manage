@@ -286,7 +286,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
 .fab{display:none;position:fixed;bottom:80px;right:18px;z-index:99;width:54px;height:54px;border-radius:50%;background:var(--accent);border:none;color:#fff;font-size:26px;cursor:pointer;box-shadow:0 4px 14px rgba(31,111,235,.5);align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;transition:transform .15s}
 .fab:active{transform:scale(.93)}
 
-@media (max-width:768px){
+@media (max-width:960px),(hover:none) and (pointer:coarse){
   /* Esconde sidebar desktop, mostra nav mobile */
   .sidebar{display:none!important}
   .mobile-nav{display:block}
@@ -386,7 +386,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
   <aside class="sidebar">
     <div class="logo">
       <div class="logo-title">SP8 Obras</div>
-      <div class="logo-sub">PRO · GESTÃO COMPLETA v6.3</div>
+      <div class="logo-sub">PRO · GESTÃO COMPLETA v6.6</div>
     </div>
     <div class="nav">
       <div class="nav-lbl">Menu</div>
@@ -409,7 +409,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
       <div class="hdr-title" id="hdr-title">Dashboard</div>
     </div>
     <div class="hdr-right">
-      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v6.3</span>
+      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v6.6</span>
       <span id="user-chip" class="user-avatar-chip" style="display:none">
         <span class="user-avatar-sm" id="user-avatar-letter">?</span>
         <span id="user-nome-chip">—</span>
@@ -417,7 +417,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
       <span class="date-chip" id="date-chip"></span>
       <span id="sync-chip" style="font-size:11px;font-family:var(--mono);padding:4px 10px;border-radius:4px;border:1px solid #e5e7eb;background:#f9fafb;color:#6b7280">💾 Local</span>
       <button class="btn btn-sm" id="btn-sync" title="Sincronizar agora" style="display:none">↻ Sync</button>
-      <button class="btn btn-primary btn-sm" id="btn-instalar-app" style="display:none" onclick="instalarApp()">📲 Instalar App</button>
+      <button class="btn btn-primary btn-sm" id="btn-instalar-app" style="display:inline-block" onclick="instalarApp()">📲 Instalar App</button>
       <button class="btn" id="btn-exp">⬇ Exportar</button>
       <button class="btn btn-primary" id="btn-nova-obra">+ Nova Obra</button>
     </div>
@@ -3359,6 +3359,17 @@ function criarLancamentos(obraId,tipo,desc,resp,valor,data,pgto,nparcelas,pgtoDa
 }
 
 function saveLanc(){
+  // Previne duplo clique
+  var btnSalvar=document.getElementById('btn-salvar-lanc');
+  if(btnSalvar){
+    if(btnSalvar.disabled) return;
+    btnSalvar.disabled=true;
+    btnSalvar.textContent='⏳ Salvando...';
+    setTimeout(function(){
+      btnSalvar.disabled=false;
+      btnSalvar.textContent='✅ Registrar Gasto';
+    },3000);
+  }
   var obraId=document.getElementById('l-obra').value;
   var tipo=document.getElementById('l-tipo').value;
   var desc=document.getElementById('l-desc').value.trim();
@@ -3402,6 +3413,18 @@ function saveLanc(){
   }
   if(!obraId){alert('Selecione uma obra');return;}
   if(!desc||!valor||valor<=0){alert('Preencha descrição e valor');return;}
+  // Detecta duplicata — mesmo lançamento nos últimos 10 segundos
+  var agora=Date.now();
+  var duplicata=S.lancamentos.some(function(l){
+    return l.obraId===obraId && l.descricao===desc && Number(l.valor)===valor/1 &&
+           l.data===data && (agora - (l._ts||0)) < 10000;
+  });
+  if(duplicata){
+    if(!confirm('⚠ Já existe um lançamento idêntico recém registrado.\nDeseja registrar novamente?')){
+      if(btnSalvar){btnSalvar.disabled=false;btnSalvar.textContent='✅ Registrar Gasto';}
+      return;
+    }
+  }
   criarLancamentos(obraId,tipo,desc,resp,valor,data,pgto,np,pgtoData,parcDatas);
   // Lançamento recorrente
   var recChk=document.getElementById('l-recorrente');
@@ -4109,13 +4132,25 @@ window.addEventListener('beforeinstallprompt',function(e){
   e.preventDefault();
   deferredPrompt=e;
   var btn=document.getElementById('btn-instalar-app');
-  if(btn)btn.style.display='inline-block';
+  if(btn){btn.style.display='inline-block';btn.textContent='📲 Instalar App';}
 });
 window.addEventListener('appinstalled',function(){
   var btn=document.getElementById('btn-instalar-app');
   if(btn)btn.style.display='none';
   deferredPrompt=null;
 });
+function instalarApp(){
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(function(r){
+      if(r.outcome==='accepted') console.log('App instalado');
+      deferredPrompt=null;
+    });
+  } else {
+    // Fallback: instrução manual
+    alert('Para instalar:\n\n1. Toque nos ⋮ três pontinhos do Chrome\n2. Selecione "Adicionar à tela inicial"\n3. Confirme tocando em "Adicionar"\n\nSe não aparecer a opção, acesse o site por 30 segundos e tente novamente.');
+  }
+}
 </script>
 </body>
 </html>
