@@ -386,7 +386,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
   <aside class="sidebar">
     <div class="logo">
       <div class="logo-title">SP8 Obras</div>
-      <div class="logo-sub">PRO · GESTÃO COMPLETA v6.7</div>
+      <div class="logo-sub">PRO · GESTÃO COMPLETA v6.8</div>
     </div>
     <div class="nav">
       <div class="nav-lbl">Menu</div>
@@ -409,7 +409,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
       <div class="hdr-title" id="hdr-title">Dashboard</div>
     </div>
     <div class="hdr-right">
-      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v6.7</span>
+      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v6.8</span>
       <span id="user-chip" class="user-avatar-chip" style="display:none">
         <span class="user-avatar-sm" id="user-avatar-letter">?</span>
         <span id="user-nome-chip">—</span>
@@ -1773,7 +1773,15 @@ function rDetalhe(obraId){
   }
 
   // todos lançamentos desta obra
-  var todosLancs=S.lancamentos.filter(function(l){return l.obraId===obraId;}).slice().sort(function(a,b){return b.data.localeCompare(a.data);});
+  var todosLancs=S.lancamentos.filter(function(l){
+    if(l.obraId!==obraId) return false;
+    if(l.tipo==='imposto') return false;
+    if(l.tipo==='fundos') return false;
+    if(l.auto===true) return false;
+    if(l.recorrente===true) return false;
+    if(l.descricao&&l.descricao.indexOf('(recorrente)')!==-1) return false;
+    return true;
+  }).slice().sort(function(a,b){return b.data.localeCompare(a.data);});
   var rows='';
   if(!todosLancs.length){rows='<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text4)">Nenhum lançamento registrado</td></tr>';}
   else{
