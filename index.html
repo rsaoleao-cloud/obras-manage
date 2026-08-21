@@ -386,7 +386,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
   <aside class="sidebar">
     <div class="logo">
       <div class="logo-title">SP8 Obras</div>
-      <div class="logo-sub">PRO · GESTÃO COMPLETA v6.8</div>
+      <div class="logo-sub">PRO · GESTÃO COMPLETA v6.9</div>
     </div>
     <div class="nav">
       <div class="nav-lbl">Menu</div>
@@ -409,7 +409,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
       <div class="hdr-title" id="hdr-title">Dashboard</div>
     </div>
     <div class="hdr-right">
-      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v6.8</span>
+      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v6.9</span>
       <span id="user-chip" class="user-avatar-chip" style="display:none">
         <span class="user-avatar-sm" id="user-avatar-letter">?</span>
         <span id="user-nome-chip">—</span>
@@ -1000,8 +1000,33 @@ function pushExclusao(exc){
 
 var MESES=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 function fM(v){return'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0});}
-function mesAtual(){var d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1);}
+// Converte data YYYY-MM-DD para o período de competência 20-a-20
+// Dia < 20 → pertence ao mês da data
+// Dia >= 20 → pertence ao mês seguinte
+function dateToMes(dataStr){
+  if(!dataStr) return mesAtual();
+  var parts=dataStr.split('-');
+  var yr=parseInt(parts[0]); var mo=parseInt(parts[1]); var dy=parseInt(parts[2]||'1');
+  if(dy>=20){ mo++; if(mo>12){mo=1;yr++;} }
+  return yr+'-'+pad(mo);
+}
+
+// Mês de competência atual (ciclo 20 a 20)
+function mesAtual(){
+  var d=new Date(); var yr=d.getFullYear(); var mo=d.getMonth()+1; var dy=d.getDate();
+  if(dy>=20){ mo++; if(mo>12){mo=1;yr++;} }
+  return yr+'-'+pad(mo);
+}
 function mesLabel(m){if(!m)return'';var p=m.split('-');return MESES[parseInt(p[1])-1]+'/'+p[0];}
+// Label com período 20 a 20 para exibição detalhada
+function mesLabelPeriodo(m){
+  if(!m)return'';
+  var p=m.split('-'); var yr=parseInt(p[0]); var mo=parseInt(p[1]);
+  // Período: 20 do mês anterior até 19 do mês atual
+  var moAnt=mo-1; var yrAnt=yr;
+  if(moAnt<1){moAnt=12;yrAnt--;}
+  return '20/'+pad(moAnt)+'/'+yrAnt+' a 19/'+pad(mo)+'/'+yr;
+}
 function pad(n){return String(n).padStart(2,'0');}
 function hoje(){var d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
 function fD(s){if(!s)return'—';var p=s.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
@@ -2341,7 +2366,8 @@ function addDias(dataStr, dias){
   var yr=d.getFullYear();
   var mo=pad(d.getMonth()+1);
   var dy=pad(d.getDate());
-  return {data:yr+'-'+mo+'-'+dy, mes:yr+'-'+mo};
+  var data=yr+'-'+mo+'-'+dy;
+  return {data:data, mes:dateToMes(data)};
 }
 
 function atualizarPreview(){
@@ -2377,7 +2403,7 @@ function atualizarPreview(){
 
   if(tipo==='30d'){
     var prazoData=(document.getElementById('l-prazo-data')||{}).value||addDias(dataVal,30).data;
-    var prazoMes=prazoData.substring(0,7);
+    var prazoMes=dateToMes(prazoData);
     rows='<div class="parc-row">'+
       '<span>📅 Vencimento</span>'+
       '<input type="date" id="parc-date-0" value="'+prazoData+'" class="fi" style="width:140px;padding:4px 8px;font-size:12px" onchange="atualizarPreview()">'+
@@ -2389,7 +2415,7 @@ function atualizarPreview(){
       // Pega data editada se existir
       var existEl=document.getElementById('parc-date-'+i);
       var dBase=existEl?existEl.value:(i===0?cartaoData:addDias(cartaoData,i*30).data);
-      var mesBase=dBase.substring(0,7);
+      var mesBase=dateToMes(dBase);
       rows+='<div class="parc-row">'+
         '<span>💳 '+(i+1)+' de '+cartaoN+'</span>'+
         '<input type="date" id="parc-date-'+i+'" value="'+dBase+'" class="fi" style="width:140px;padding:4px 8px;font-size:12px" onchange="recalcParc()">'+
@@ -2402,7 +2428,7 @@ function atualizarPreview(){
     for(var i=0;i<n;i++){
       var existEl=document.getElementById('parc-date-'+i);
       var dBase=existEl?existEl.value:addDias(dataVal,i*30).data;
-      var mesBase=dBase.substring(0,7);
+      var mesBase=dateToMes(dBase);
       rows+='<div class="parc-row">'+
         '<span>'+(i+1)+' de '+n+'</span>'+
         '<input type="date" id="parc-date-'+i+'" value="'+dBase+'" class="fi" style="width:140px;padding:4px 8px;font-size:12px" onchange="recalcParc()">'+
@@ -2419,7 +2445,7 @@ function recalcParc(){
   var i=0;
   while(document.getElementById('parc-date-'+i)){
     var el=document.getElementById('parc-date-'+i);
-    var mes=el.value?el.value.substring(0,7):'';
+    var mes=el.value?dateToMes(el.value):'';
     var next=el.nextElementSibling;
     if(next&&next.tagName==='SPAN') next.textContent=mes?mesLabel(mes):'';
     i++;
@@ -2585,7 +2611,7 @@ function editarLanc(id, onSave){
     novo.descricao = novaDesc;
     novo.resp      = novaResp;
     novo.data      = novaData;
-    novo.mes       = novaData.substring(0,7);
+    novo.mes = dateToMes(novaData);
     S.lancamentos[idx] = novo;
     sv();
     pushLanc(novo);
@@ -3088,11 +3114,11 @@ function atualizarPreviewModal(){
   var rows='';
   if(tipo==='30d'){
     var prazoData=(document.getElementById('ml-prazo-data')||{}).value||addDias(dataVal,30).data;
-    rows='<div class="parc-row"><span>📅 Vencimento: <strong>'+fD(prazoData)+'</strong></span><span style="font-size:10px;color:var(--text3);font-family:var(--mono)">'+mesLabel(prazoData.substring(0,7))+'</span><span>'+fM(valor)+'</span></div>';
+    rows='<div class="parc-row"><span>📅 Vencimento: <strong>'+fD(prazoData)+'</strong></span><span style="font-size:10px;color:var(--text3);font-family:var(--mono)">'+mesLabel(dateToMes(prazoData))+'</span><span>'+fM(valor)+'</span></div>';
   } else if(tipo==='cartao'){
     var cartaoData=(document.getElementById('ml-cartao-data')||{}).value||addDias(dataVal,30).data;
     for(var i=0;i<cartaoN;i++){
-      var r=i===0?{data:cartaoData,mes:cartaoData.substring(0,7)}:addDias(cartaoData,i*30);
+      var r=i===0?{data:cartaoData,mes:dateToMes(cartaoData)}:addDias(cartaoData,i*30);
       rows+='<div class="parc-row"><span>💳 '+(i+1)+' de '+cartaoN+' · <strong>'+fD(r.data)+'</strong></span><span style="font-size:10px;color:var(--text3);font-family:var(--mono)">'+mesLabel(r.mes)+'</span><span>'+fM(parcVal)+'</span></div>';
     }
     if(cartaoN>1) rows+='<div class="parc-row" style="font-weight:600"><span>Total</span><span>'+fM(valor)+'</span></div>';
@@ -3149,7 +3175,7 @@ function gerarImpostoObra(o){
   // Meses de vigência — do atual até o prazo
   var meses = [];
   var m = mesInicio;
-  var limite = prazo ? prazo.substring(0,7) : '';
+  var limite = prazo ? dateToMes(prazo.substring(0,7)+'-19') : '';
   for(var i=0; i<60; i++){
     meses.push(m);
     if(limite && m >= limite) break;
@@ -3175,7 +3201,11 @@ function gerarImpostoObra(o){
   // Cria novos — vencimento dia 20 de cada mês
   meses.forEach(function(mes){
     if(mesFechado(mes)) return;
-    var dp = mes+'-20'; // vence todo dia 20
+    // Imposto: vence dia 20 que INICIA o período de competência
+    // Período Ago/2026 = 20/Jul a 19/Ago → data do imposto = 20/Jul
+    var pMes=mes.split('-'); var yrM=parseInt(pMes[0]); var moM=parseInt(pMes[1])-1;
+    if(moM<1){moM=12;yrM--;}
+    var dp=yrM+'-'+pad(moM)+'-20';
     var l = {
       id: 'imp'+o.id+mes,
       obraId: o.id,
@@ -3329,19 +3359,19 @@ function criarLancamentos(obraId,tipo,desc,resp,valor,data,pgto,nparcelas,pgtoDa
     // Para prazo: usa pgtoData (campo l-prazo-data), ignora parcDatas
     var venc=pgtoData||addDias(data,30).data;
     if(!venc||venc.length<7){ alert('Informe a data de vencimento'); return; }
-    parcelas.push({data:venc, mes:venc.substring(0,7)});
+    parcelas.push({data:venc, mes:dateToMes(venc)});
   } else if(pgto==='cartao'){
     var fatData=pgtoData||addDias(data,30).data;
     for(var i=0;i<n;i++){
       var d2=parcDatas&&parcDatas[i]?parcDatas[i]:(i===0?fatData:addDias(fatData,i*30).data);
-      parcelas.push({data:d2,mes:d2.substring(0,7)});
+      parcelas.push({data:d2,mes:dateToMes(d2)});
     }
   } else if(pgto==='avista'){
-    parcelas.push({data:data, mes:data.substring(0,7)});
+    parcelas.push({data:data, mes:dateToMes(data)});
   } else {
     for(var i=0;i<n;i++){
       var d2=parcDatas&&parcDatas[i]?parcDatas[i]:addDias(data,i*30).data;
-      parcelas.push({data:d2,mes:d2.substring(0,7)});
+      parcelas.push({data:d2,mes:dateToMes(d2)});
     }
   }
 
@@ -3478,7 +3508,7 @@ function saveLanc(){
   var ppEl=document.getElementById('l-prazo-data');if(ppEl)ppEl.value='';
   var cwEl=document.getElementById('l-cartao-wrap');if(cwEl)cwEl.style.display='none';
   var pwEl=document.getElementById('l-prazo-wrap');if(pwEl)pwEl.style.display='none';
-  checkAlerta(obraId,data.substring(0,7));
+  checkAlerta(obraId,dateToMes(data));
   atualizarListaLancs();
   renderSidebarObras();
 }
@@ -3498,7 +3528,7 @@ function saveLancModal(){
   if(pgto==='cartao') pgtoData=(document.getElementById('ml-cartao-data')||{}).value||addDias(data,30).data;
   if(!desc||!valor||Number(valor)<=0){alert('Preencha descrição e valor');return;}
   criarLancamentos(obraId,tipo,desc,resp,valor,data,pgto,np,pgtoData,null);
-  sv();closeModal();checkAlerta(obraId,data.substring(0,7));
+  sv();closeModal();checkAlerta(obraId,dateToMes(data));
   renderPage(S.pagina);renderSidebarObras();
 }
 
