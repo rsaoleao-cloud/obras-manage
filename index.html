@@ -32,7 +32,7 @@
   --r:10px;--rsm:6px;--rlg:14px;
   --sidebar:268px;--header:58px;
 }
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px}
 .app{display:grid;grid-template-columns:var(--sidebar) 1fr;grid-template-rows:var(--header) 1fr;height:100vh;overflow:hidden;transition:grid-template-columns .25s ease}
 .app.sidebar-oculta{grid-template-columns:0px 1fr}
 
@@ -386,7 +386,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
   <aside class="sidebar">
     <div class="logo">
       <div class="logo-title">SP8 Obras</div>
-      <div class="logo-sub">PRO · GESTÃO COMPLETA v6.9</div>
+      <div class="logo-sub">PRO · GESTÃO COMPLETA v7.0</div>
     </div>
     <div class="nav">
       <div class="nav-lbl">Menu</div>
@@ -409,7 +409,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
       <div class="hdr-title" id="hdr-title">Dashboard</div>
     </div>
     <div class="hdr-right">
-      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v6.9</span>
+      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v7.0</span>
       <span id="user-chip" class="user-avatar-chip" style="display:none">
         <span class="user-avatar-sm" id="user-avatar-letter">?</span>
         <span id="user-nome-chip">—</span>
@@ -1734,32 +1734,59 @@ function rObras(){
     document.getElementById('obras-content').innerHTML='<div class="empty"><div class="empty-icon">🏗️</div><div class="empty-text">Nenhuma obra cadastrada.<br>Clique em <strong>+ Nova Obra</strong>.</div></div>';
     return;
   }
+
+  // Gera os 3 meses: atual + 2 próximos
+  function proximoMes(m, n){
+    var p=m.split('-'); var yr=parseInt(p[0]); var mo=parseInt(p[1])+n;
+    while(mo>12){mo-=12;yr++;} return yr+'-'+pad(mo);
+  }
+  var meses3=[mes, proximoMes(mes,1), proximoMes(mes,2)];
+
   var h='<div class="obras-grid">';
   S.obras.forEach(function(o){
     var p=pctBudget(o.id,mes),tot=totalMesObra(o.id,mes),totG=totalObra(o.id);
     var cor=pctColor(p),cls=pctClass(p);
     var mg=margemLucro(o);
+
+    // Previsão dos 3 meses
+    var mesesHtml='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0;padding:10px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)">';
+    meses3.forEach(function(m3, idx){
+      var t3=totalMesObra(o.id,m3);
+      var p3=budgetEfetivo(o)>0?((t3/budgetEfetivo(o))*100):0;
+      var c3=pctColor(p3);
+      var isFech=mesFechado(m3);
+      var isAtual=idx===0;
+      mesesHtml+=
+        '<div style="text-align:center;background:'+(isAtual?'var(--bg3)':'var(--card)')+';border-radius:var(--rsm);padding:8px 6px;'+(isAtual?'border:1px solid var(--border2)':'')+'">'+
+          '<div style="font-size:11px;font-weight:'+(isAtual?'700':'500')+';color:'+(isAtual?'var(--accent)':'var(--text3)')+';font-family:var(--mono);margin-bottom:4px">'+
+            mesLabel(m3)+(isFech?' 🔒':isAtual?' ←':'')+'</div>'+
+          '<div style="font-size:16px;font-weight:700;color:'+(t3>0?c3:'var(--text4)')+';font-family:var(--mono)">'+fM(t3)+'</div>'+
+          (t3>0?'<div style="font-size:10px;color:'+c3+';font-family:var(--mono)">'+p3.toFixed(0)+'% budget</div>':'<div style="font-size:10px;color:var(--text4)">previsto: '+fM(budgetEfetivo(o))+'</div>')+
+        '</div>';
+    });
+    mesesHtml+='</div>';
+
     h+='<div class="oc">'+
       '<div class="oc-status">'+statusBadge(o.status)+'</div>'+
-      '<div class="oc-name" style="cursor:pointer" data-id="'+o.id+'">'+semaforo(o.prazo)+' &nbsp;'+o.nome+'</div>'+
-      '<div class="oc-tempo">'+tempoObra(o.inicio,o.prazo)+'</div>'+
+      '<div class="oc-name" style="cursor:pointer;font-size:18px" data-id="'+o.id+'">'+semaforo(o.prazo)+' &nbsp;'+o.nome+'</div>'+
+      '<div class="oc-tempo" style="font-size:12px">'+tempoObra(o.inicio,o.prazo)+'</div>'+
+      mesesHtml+
       '<div class="oc-rows">'+
-        '<div class="oc-row"><span class="oc-rl">Budget mensal</span><span class="oc-rv">'+fM(budgetEfetivo(o))+'</span></div>'+
-        '<div class="oc-row"><span class="oc-rl">Custo previsto</span><span class="oc-rv">'+fM(o.custo_previsto||0)+'</span></div>'+
-        '<div class="oc-row"><span class="oc-rl">Contrato fechado</span><span class="oc-rv" style="color:#0891b2">'+fM(o.contrato||0)+'</span></div>'+
-        (mg?'<div class="oc-row"><span class="oc-rl">Margem estimada</span><span class="oc-rv" style="color:'+(mg.margem>=0?'#16a34a':'#dc2626')+'">'+fM(mg.margem)+' ('+mg.pct+'%)</span></div>':'')+
-        '<div class="oc-row"><span class="oc-rl">Gasto '+mesLabel(mes)+'</span><span class="oc-rv" style="color:'+cor+'">'+fM(tot)+'</span></div>'+
-        '<div class="oc-row"><span class="oc-rl">Gasto total acumulado</span><span class="oc-rv">'+fM(totG)+'</span></div>'+
+        '<div class="oc-row"><span class="oc-rl">Budget mensal</span><span class="oc-rv" style="font-size:14px">'+fM(budgetEfetivo(o))+'</span></div>'+
+        '<div class="oc-row"><span class="oc-rl">Custo previsto</span><span class="oc-rv" style="font-size:14px">'+fM(o.custo_previsto||0)+'</span></div>'+
+        '<div class="oc-row"><span class="oc-rl">Contrato fechado</span><span class="oc-rv" style="color:#0891b2;font-size:14px">'+fM(o.contrato||0)+'</span></div>'+
+        (mg?'<div class="oc-row"><span class="oc-rl">Margem estimada</span><span class="oc-rv" style="color:'+(mg.margem>=0?'#16a34a':'#dc2626')+';font-size:14px">'+fM(mg.margem)+' ('+mg.pct+'%)</span></div>':'')+
+        '<div class="oc-row"><span class="oc-rl">Gasto total acumulado</span><span class="oc-rv" style="font-size:14px">'+fM(totG)+'</span></div>'+
         '<div class="oc-row"><span class="oc-rl">Prazo</span><span>'+prazoBadge(o.prazo)+'</span></div>'+
       '</div>'+
       '<div class="prog-wrap">'+
-        '<div class="prog-lbl"><span>Budget mensal · Saldo: '+fM(Math.max(0,budgetEfetivo(o)-tot))+'</span><span style="color:'+cor+'">'+p.toFixed(0)+'%</span></div>'+
+        '<div class="prog-lbl"><span style="font-size:12px">Budget '+mesLabel(mes)+' · Saldo: '+fM(Math.max(0,budgetEfetivo(o)-tot))+'</span><span style="color:'+cor+';font-size:13px;font-weight:700">'+p.toFixed(0)+'%</span></div>'+
         '<div class="prog-bar"><div class="prog-fill '+cls+'" style="width:'+Math.min(p,100)+'%"></div></div>'+
       '</div>'+
       '<div class="oc-actions">'+
-        '<button class="btn" style="font-size:11px" data-id="'+o.id+'" data-act="edit">✏ Editar</button>'+
-        '<button class="btn btn-danger" style="font-size:11px" data-id="'+o.id+'" data-act="del">🗑 Excluir</button>'+
-        '<button class="btn" style="font-size:11px;margin-left:auto" data-id="'+o.id+'" data-act="det">Ver detalhes →</button>'+
+        '<button class="btn" style="font-size:12px;padding:6px 14px" data-id="'+o.id+'" data-act="edit">✏ Editar</button>'+
+        '<button class="btn btn-danger" style="font-size:12px;padding:6px 14px" data-id="'+o.id+'" data-act="del">🗑 Excluir</button>'+
+        '<button class="btn" style="font-size:12px;padding:6px 14px;margin-left:auto" data-id="'+o.id+'" data-act="det">Ver detalhes →</button>'+
       '</div>'+
     '</div>';
   });
