@@ -386,7 +386,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
   <aside class="sidebar">
     <div class="logo">
       <div class="logo-title">SP8 Obras</div>
-      <div class="logo-sub">PRO · GESTÃO COMPLETA v7.0</div>
+      <div class="logo-sub">PRO · GESTÃO COMPLETA v7.1</div>
     </div>
     <div class="nav">
       <div class="nav-lbl">Menu</div>
@@ -409,7 +409,7 @@ select.fi option{background:var(--bg2);color:var(--text)}
       <div class="hdr-title" id="hdr-title">Dashboard</div>
     </div>
     <div class="hdr-right">
-      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v7.0</span>
+      <span style="font-size:9px;font-family:var(--mono);color:var(--text4);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 7px;letter-spacing:.3px">v7.1</span>
       <span id="user-chip" class="user-avatar-chip" style="display:none">
         <span class="user-avatar-sm" id="user-avatar-letter">?</span>
         <span id="user-nome-chip">—</span>
@@ -1853,6 +1853,40 @@ function rDetalhe(obraId){
     prazoInfo='<div class="det-sc"><div class="det-num" style="color:var(--text4);font-size:12px">—</div><div class="det-lbl">Sem prazo</div></div>';
   }
 
+  // ---- LANÇAMENTOS ESPECIAIS (imposto + retiradas) ----
+  var especiais=S.lancamentos.filter(function(l){
+    if(l.obraId!==obraId) return false;
+    if(l.tipo==='imposto') return true;
+    if(l.recorrente===true) return true;
+    if(l.descricao&&l.descricao.indexOf('(recorrente)')!==-1) return true;
+    return false;
+  }).slice().sort(function(a,b){return b.data.localeCompare(a.data);}).slice(0,20);
+
+  var especiaisHtml='';
+  if(especiais.length){
+    var eRows=especiais.map(function(l){
+      var cat=CATEGORIAS[l.tipo]||CATEGORIAS.despesa;
+      return'<tr>'+
+        '<td style="white-space:nowrap">'+fD(l.data)+'</td>'+
+        '<td>'+l.descricao+'</td>'+
+        '<td>'+catBadge(l.tipo)+'</td>'+
+        '<td style="font-family:var(--mono);text-align:right">'+fM(l.valor)+'</td>'+
+        '<td><button class="btn" style="font-size:10px;padding:2px 8px;border-color:var(--accent);color:var(--accent)" onclick="editarLanc(\''+l.id+'\',function(){rDetalhe(\''+obraId+'\');})">✏️ Editar</button></td>'+
+      '</tr>';
+    }).join('');
+    especiaisHtml=
+      '<div class="fcard" style="margin-top:14px">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'+
+          '<div class="section-hdr" style="margin:0">⚙️ Lançamentos especiais (imposto e retiradas)</div>'+
+          '<span style="font-size:11px;color:var(--text3);font-family:var(--mono)">Clique ✏️ para editar valor ou data</span>'+
+        '</div>'+
+        '<div class="tw"><table>'+
+          '<thead><tr><th>Data</th><th>Descrição</th><th>Tipo</th><th style="text-align:right">Valor</th><th>Ação</th></tr></thead>'+
+          '<tbody>'+eRows+'</tbody>'+
+        '</table></div>'+
+      '</div>';
+  }
+
   document.getElementById('detalhe-content').innerHTML=
     '<div style="display:flex;gap:7px;margin-bottom:18px;align-items:center">'+
       '<button class="btn" id="det-back">← Voltar</button>'+
@@ -1951,7 +1985,8 @@ function rDetalhe(obraId){
       '<div class="margem-row" style="font-size:13px;font-weight:600"><span>Margem estimada</span><span style="font-family:var(--mono);color:'+(mg.margem>=0?'#16a34a':'#dc2626')+'">'+fM(mg.margem)+' ('+mg.pct+'%)</span></div>'+
     '</div>':'')+
     '<div class="section-hdr">Todos os lançamentos</div>'+
-    '<div class="tw"><table><thead><tr><th>Data</th><th>Descrição</th><th>Responsável</th><th>Categoria</th><th>Pagamento</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+    '<div class="tw"><table><thead><tr><th>Data</th><th>Descrição</th><th>Responsável</th><th>Categoria</th><th>Pagamento</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    especiaisHtml;
 
   document.getElementById('det-back').addEventListener('click',function(){showPage(S.pagina||'obras');});
   document.getElementById('det-edit').addEventListener('click',function(){modalObra(this.dataset.id);});
